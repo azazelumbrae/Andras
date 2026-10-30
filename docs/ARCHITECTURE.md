@@ -346,3 +346,11 @@ pantalla no para nada: el daemon sigue y el operador puede volver por terminal.
 
 La memoria de un ataque suelto se exporta con `andras notes export --mission <id> --attack
 <attack_id>`; el diario completo, sin `--attack`.
+
+## 18. Respuesta por Telegram
+
+`andras bot` cierra el canal conversacional: recoge mensajes con `getUpdates`, los cruza con
+la entrega de ese chat y contesta con el modelo en el papel del guion, en una a tres frases.
+Cada intercambio queda en `bot_messages`, se marca `replied` en la campaña y se anota en el
+diario. El operador puede parar el bot y escribir a mano cuando el momento lo pida: el guion
+está en la nota y en el diario.

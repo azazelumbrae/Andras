@@ -19,8 +19,11 @@ Estado actual:
 - [x] render por canal, QA y entrega SMTP/Telegram/Twilio/manual
 - [x] landing con formulario y captura
 - [x] campañas omnicanal con disparadores y reintentos
+- [x] agente con aclaraciones, OSINT, plan, crítico y revisión humana
+- [x] daemon de ejecución con jobs, backoff, avisos y webhooks firmados
+- [x] wallets burner → mixer → treasury y perfiles de red/OPSEC
 - [x] 201 packs importados de unjail.ai, validados
 - [x] informe de misión exportable (`debrief`)
-- [ ] bot conversacional para Telegram (respuesta adaptativa)
+- [x] bot conversacional para Telegram (`andras bot`, responde con el guion)
 - [ ] proxy inverso tipo Evilginx
 - [ ] captura de OTP

@@ -674,6 +674,15 @@ def plan_list(mission_id: str | None = typer.Option(None, "--mission")) -> None:
 
 
 @app.command()
+def bot(interval: int = typer.Option(8, "--interval", help="segundos entre pasadas"),
+        once: bool = typer.Option(False, "--once", help="una pasada y salir")) -> None:
+    """Contesta por Telegram como la persona del guion, mientras el operador vigila."""
+    from andras import bot as bot_mod
+
+    raise typer.Exit(bot_mod.loop(interval=interval, once=once))
+
+
+@app.command()
 def debrief(mission_id: str | None = typer.Option(None, "--mission")) -> None:
     """Genera el informe de la misión y lo guarda en data/reports."""
     from andras.brain import debrief as debrief_mod

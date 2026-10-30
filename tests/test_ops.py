@@ -239,3 +239,37 @@ def test_preflight_warns_without_hook_secret(config):
     assert names["firma webhooks"] == preflight.WARN
     assert names["base_url"] == preflight.FAIL
     assert "entorno" in names
+
+
+def test_bot_answers_telegram(conn, config, mission, monkeypatch, tmp_path):
+    from andras import bot
+    from andras.brain import provider
+
+    monkeypatch.setattr(bot, "OFFSET", tmp_path / "offset.json")
+    config["telegram_token"] = "t"
+    conn.execute("INSERT INTO attacks(id,mission_id,vector,angle,script,created_at)"
+                 " VALUES('a1',?,'telegram','x','hola, soy Ana','2026-01-01')", (mission.id,))
+    conn.execute("INSERT INTO campaigns(id,scenario,recipient_hash,created_at)"
+                 " VALUES('c1','s','h','2026-01-01')")
+    conn.execute("INSERT INTO deliveries(attack_id,campaign_id,channel,target)"
+                 " VALUES('a1','c1','telegram','42')")
+    conn.commit()
+
+    class Resp:
+        def __init__(self, data):
+            self.data = data
+
+        def json(self):
+            return self.data
+
+        text = ""
+
+    monkeypatch.setattr(bot.httpx, "get", lambda *a, **k: Resp(
+        {"ok": True, "result": [{"update_id": 7, "message": {"chat": {"id": 42},
+                                                             "text": "¿quién eres?"}}]}))
+    monkeypatch.setattr(bot.httpx, "post", lambda *a, **k: Resp({"ok": True}))
+    monkeypatch.setattr(provider, "complete", lambda *a, **k: "Soy Ana, de soporte.")
+    assert bot.poll_once(conn, config, log=lambda *_: None) == 1
+    assert conn.execute("SELECT COUNT(*) AS n FROM bot_messages").fetchone()["n"] == 2
+    assert conn.execute("SELECT event FROM events ORDER BY id DESC").fetchone()[0] == "replied"
+    assert bot._offset() == 8
