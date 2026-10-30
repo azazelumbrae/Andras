@@ -238,3 +238,86 @@ texto y el enlace con token: el operador puede enviarlo a mano sin romper la sec
 
 Los packs de unjail.ai se importan con `scripts/import_unjail_packs.py` (201 packs, 7 turnos)
 y `packs --validate` los comprueba todos.
+
+## 10. El agente
+
+El operador no rellena el plan: lo conduce un agente con herramientas. Hay cuatro fases y
+ninguna envía por sí sola.
+
+| Fase | Qué hace | Quién la cierra |
+|---|---|---|
+| Aclaraciones | 4-6 preguntas de opción múltiple, con respaldo fijo si el modelo falla | el operador |
+| Recon | OSINT con herramientas, notas y enlaces de soporte | el agente |
+| Plan | 3-6 pasos, criterio de éxito y crítico adversarial | el agente |
+| Revisión | lectura, conversación, edición, confirmación | el operador |
+
+El bucle vive en `andras/agent/loop.py`: modelo → herramienta → observación, con tope de
+pasos, tokens y dinero. Un plan confirmado es el consentimiento: desde ahí los pasos `send`
+corren solos. `spend` pregunta por encima del umbral y `admin` pregunta siempre.
+
+Las herramientas se registran con esquema JSON y clase de permiso (`read`, `write`, `send`,
+`spend`, `admin`). Sin registro, el modelo no las ve. Cada llamada queda en `tool_runs` y
+el transcript en `data/runs/<id>.jsonl`.
+
+Ningún plan sale sin crítico: se revisan contradicciones, huecos y kill switches. Si el
+crítico lo tumba, el agente corrige y reenvía.
+
+## 11. Ejecución y avisos
+
+`andras run start` levanta el daemon; `--detach` lo separa. Cada plan confirmado genera un
+`job` por paso con su vencimiento. Un job sólo corre con alquiler, así que dos daemons no
+duplican envíos. Los fallos se reintentan con backoff exponencial (5 min → 40 min) y a los
+cinco intentos se marcan `failed` y se avisa en nivel `critical`.
+
+Los disparadores se reevalúan cada 2 h y se dan por perdidos a las 96 h. El watchdog avisa
+si un plan lleva 48 h sin movimiento.
+
+Avisos: escritorio macOS y Telegram, niveles `info`, `hit` y `critical`. `hit` se dispara
+cuando se cumple el criterio de éxito y pausa el resto del plan. Cada aviso queda registrado
+en `notifications`, falle o no.
+
+## 12. Webhooks y píxel
+
+`andras serve` expone, además de la landing:
+
+| Ruta | Uso |
+|---|---|
+| `GET /px/<token>` | píxel de apertura, PNG de 1×1 |
+| `GET\|POST /hook/<token>/<tipo>` | aviso de un proveedor externo |
+
+Tipos aceptados: `visited`, `submitted`, `replied`, `delivered`, `bounced`, `opened`,
+`clicked`, `reported`, `complained`. Si hay `hook_secret`, el cuerpo debe venir firmado con
+`X-Andras-Signature` (HMAC-SHA256 hexadecimal). El cuerpo JSON puede traer `detail`, que se
+guarda en el evento.
+
+## 13. Dinero
+
+Tres papeles, siempre en este orden: `burner` paga, `mixer` mezcla, `treasury` sólo recibe.
+BTC con `embit` (BIP39 → BIP84, testnet por defecto); Monero por `monero-wallet-rpc`. La
+semilla se guarda en la base de datos porque es un laboratorio, no un monedero de producción.
+
+Todo movimiento descuenta del presupuesto cripto de la misión (`0.001 BTC` por defecto) y
+el gasto por encima del tope lo autoriza el operador. Las transferencias BTC se firman fuera;
+el agente deja el movimiento registrado y el runbook de mezcla.
+
+## 14. OPSEC
+
+Perfiles de red por misión: `direct`, `doh`, `tor` o `proxy`. Con `tor`, el recon sale por
+SOCKS5 local; con `doh`, cabeceras de DNS cifrado; `jitter_ms` reparte esperas. Sin Tor
+arrancado todo degrada a directo.
+
+`infra burn` marca dominio, buzón y personas como quemados para no reutilizarlos en otra
+campaña. El `sim_swap_runbook` deja escrito qué pedir al operador, con qué excusa y qué
+ventana se tiene antes de que reviertan la portabilidad.
+
+## 15. Fases
+
+| Fase | Contenido | Estado |
+|---|---|---|
+| P0 | esquema, registro de herramientas, permisos, preflight, wizard básico | hecho |
+| P1 | bucle del agente, OSINT, plan, aclaraciones, revisión | hecho |
+| P2 | jobs, scheduler, daemon, webhooks, criterios de éxito, avisos | hecho |
+| P3 | SPF/DKIM/DMARC, IMAP, Telegram entrante, runbooks de canal | hecho |
+| P4 | wallets BTC/XMR, movimientos, mezcla, treasury | hecho |
+| P5 | perfiles de red, Tor, DoH, jitter, quema | hecho |
+| P6 | docs, export del diario, pruebas con modelo real | en curso |

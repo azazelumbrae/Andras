@@ -32,9 +32,10 @@ def database(config):
     return conn
 
 
-def record(conn, campaign_id, event):
-    conn.execute("INSERT INTO events(campaign_id,event,occurred_at) VALUES(?,?,?)",
-                 (campaign_id, event, datetime.now(UTC).isoformat()))
+def record(conn, campaign_id, event, detail: str = ""):
+    conn.execute("INSERT INTO events(campaign_id,event,occurred_at,meta) VALUES(?,?,?,?)",
+                 (campaign_id, event, datetime.now(UTC).isoformat(),
+                  json.dumps({"detail": detail} if detail else {})))
     conn.commit()
 
 

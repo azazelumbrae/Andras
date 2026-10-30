@@ -1,4 +1,17 @@
 """Motor del agente: registro de herramientas, permisos e invocación."""
-from andras.agent import builtin, gates, tools
+from andras.agent import (
+    builtin,
+    channel_tools,
+    clarify,
+    gates,
+    loop,
+    net_tools,
+    ops_tools,
+    plan_tools,
+    recon_tools,
+    runner,
+    tools,
+    wallet_tools,
+)
 
-__all__ = ["builtin", "gates", "tools"]
+__all__ = ["builtin", "channel_tools", "clarify", "gates", "loop", "net_tools", "ops_tools", "plan_tools", "recon_tools", "runner", "tools", "wallet_tools"]

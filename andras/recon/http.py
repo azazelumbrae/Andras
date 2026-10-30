@@ -27,16 +27,24 @@ def snapshot_dir(mission_id: str) -> Path:
 
 
 def fetch(url: str, *, delay: float = DEFAULT_DELAY, timeout: float = 20.0,
-          headers: dict | None = None) -> tuple[str, str, str | None]:
-    """Devuelve (texto, content_type, ruta_snapshot). Lanza FetchError."""
+          headers: dict | None = None, profile: dict | None = None
+          ) -> tuple[str, str, str | None]:
+    """Devuelve (texto, content_type, ruta_snapshot). Lanza FetchError.
+
+    `profile` es un perfil de red (`andras.net.options`): proxy, UA y DoH.
+    """
+    from andras import net
+
     host = httpx.URL(url).host or url
     wait = _last.get(host, 0) + delay - time.monotonic()
     if wait > 0:
         time.sleep(wait)
     _last[host] = time.monotonic()
 
+    options = net.options({}, profile)
+    merged = {"User-Agent": UA, **options["headers"], **(headers or {})}
     try:
-        with httpx.stream("GET", url, headers={"User-Agent": UA, **(headers or {})},
+        with httpx.stream("GET", url, headers=merged, proxy=options["proxy"],
                           timeout=timeout, follow_redirects=True) as resp:
             if resp.status_code >= 400:
                 raise FetchError(f"HTTP {resp.status_code}")

@@ -118,7 +118,7 @@ def _call(target: Target, messages, temperature, json_mode, max_tokens) -> str:
             time.sleep(1.5 * (attempt + 1))
             continue
         if resp.status_code in TRANSIENT:
-            last = f"HTTP {resp.status_code}"
+            last = f"HTTP {resp.status_code}: {resp.text[:200]}"
             time.sleep(1.5 * (attempt + 1))
             continue
         if resp.status_code >= 400:
@@ -192,7 +192,7 @@ def _call_tools(target: Target, messages, tools, temperature, max_tokens) -> dic
             time.sleep(1.5 * (attempt + 1))
             continue
         if resp.status_code in TRANSIENT:
-            last = f"HTTP {resp.status_code}"
+            last = f"HTTP {resp.status_code}: {resp.text[:200]}"
             time.sleep(1.5 * (attempt + 1))
             continue
         if resp.status_code >= 400:

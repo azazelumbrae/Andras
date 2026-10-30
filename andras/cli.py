@@ -86,11 +86,22 @@ def list_tools() -> None:
 # ------------------------------------------------------------------ v1: entrenamiento
 
 @app.command()
-def init() -> None:
+def init(searxng: bool = typer.Option(False, "--searxng",
+                                      help="prepara un SearXNG local en docker")) -> None:
     """Crea config.json y la base de datos si faltan."""
     config_path = ROOT / "config.json"
     if not config_path.exists():
         config_path.write_text((ROOT / "config.example.json").read_text())
+    if searxng:
+        import secrets
+
+        target = ROOT / "data" / "searxng" / "settings.yml"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            "use_default_settings: true\nserver:\n"
+            f"  secret_key: \"{secrets.token_hex(32)}\"\n  limiter: false\n"
+            "search:\n  safe_search: 0\n  formats:\n    - html\n    - json\n")
+        console.print("SearXNG preparado. Arráncalo con `scripts/dev_searxng.sh`.")
     conn = database(load_config())
     conn.close()
     console.print("Listo. Edita config.json antes de usar SMTP.")
@@ -557,6 +568,96 @@ def campaign_run(plan_id: str, to: str = typer.Option(..., "--to"),
         plans.set_status(conn, plan_id, "done")
 
 
+def _ask_operator(question: str, options: tuple = ()) -> str:
+    """Pregunta al humano sólo si hay terminal; si no, devuelve vacío."""
+    import sys
+
+    if not sys.stdin.isatty():
+        console.print(f"[dim]pregunta sin terminal:[/dim] {question} {options}")
+        return ""
+    try:
+        return typer.prompt(f"{question} {options}")
+    except (typer.Abort, EOFError):
+        return ""
+
+
+@app.command()
+def agent(mission_id: str | None = typer.Option(None, "--mission"),
+          auto: bool = typer.Option(False, "--auto", help="no preguntar, usar el encargo"),
+          steps: int = typer.Option(0, "--steps", help="tope de pasos de esta tanda")) -> None:
+    """Deja al agente investigar y proponer el plan, sin enviar nada."""
+    import secrets
+
+    from andras.agent import clarify as clarify_mod
+    from andras.agent import gates, runner
+    from andras.agent.tools import ToolContext
+    from andras.store import budgets, db
+
+    config = _config()
+    mission = _mission(config, mission_id)
+    with db.session(config) as conn:
+        caps = {k: v for k, v in (config.get("agent") or {}).items()
+                if k in {"max_steps", "max_tokens", "max_usd"}}
+        if steps:
+            caps["max_steps"] = steps
+        budgets.set_budget(conn, mission.id, **caps)
+        answers = {}
+        if not auto:
+            for row in clarify_mod.generate(config, mission):
+                options = " / ".join(row["options"])
+                answers[row["question"]] = typer.prompt(f"{row['question']} [{options}]")
+        plan_id = runner.draft_plan(conn, mission, mission.target_name)
+        ctx = ToolContext(conn=conn, config=config, mission=mission,
+                          run_id=secrets.token_hex(6), plan_id=plan_id, log=console.print,
+                          ask=_ask_operator)
+        policy = gates.Policy(mode="autonomo" if auto else "asistido",
+                              approver=lambda q, p: typer.confirm(q, default=True))
+        console.print("[dim]recon determinista inicial…[/dim]")
+        runner.seed(conn, config, mission, log=console.print)
+        result = runner.recon(ctx, policy, answers)
+    console.print(f"[bold]Fin:[/bold] {result.reason} · {result.steps} pasos · "
+                  f"{result.tokens} tokens · {result.usd:.4f} USD")
+    if result.message:
+        console.print(result.message)
+    with db.readonly(config) as conn:
+        console.print(runner.review_summary(conn, plan_id))
+    console.print(f"\nPlan [bold]{plan_id}[/bold]. Confírmalo con `andras plan confirm` "
+                  "o desde el wizard.")
+
+
+plan_app = typer.Typer(help="Planes del agente: confirmar, listar.")
+app.add_typer(plan_app, name="plan")
+
+
+@plan_app.command("confirm")
+def plan_confirm(plan_id: str) -> None:
+    """Marca un plan como confirmado (consentimiento permanente para sus pasos)."""
+    from andras.store import db, plans
+
+    config = _config()
+    with db.session(config) as conn:
+        plan = plans.get(conn, plan_id)
+        if not plan:
+            raise typer.Exit("Plan inexistente")
+        if len(plans.steps(conn, plan_id)) < 3:
+            raise typer.Exit("El plan necesita al menos 3 pasos")
+        plans.set_status(conn, plan_id, "confirmed")
+    console.print(f"Plan [bold]{plan_id}[/bold] confirmado.")
+
+
+@plan_app.command("list")
+def plan_list(mission_id: str | None = typer.Option(None, "--mission")) -> None:
+    """Lista los planes de una misión."""
+    from andras.store import db, plans
+
+    config = _config()
+    mission = _mission(config, mission_id)
+    with db.readonly(config) as conn:
+        rows = [[p["id"], p["status"], p["title"], len(plans.steps(conn, p["id"]))]
+                for p in plans.for_mission(conn, mission.id)]
+    _table("Planes", ["id", "estado", "título", "pasos"], rows)
+
+
 @app.command()
 def debrief(mission_id: str | None = typer.Option(None, "--mission")) -> None:
     """Genera el informe de la misión y lo guarda en data/reports."""
@@ -576,6 +677,234 @@ def tui() -> None:
     from andras.tui import run
 
     run()
+
+
+ops_app = typer.Typer(help="Daemon de ejecución: arrancar, parar, estado, pausa y aborto.")
+app.add_typer(ops_app, name="run")
+
+
+@ops_app.command("start")
+def ops_start(plan: list[str] | None = typer.Option(None, "--plan"),
+              interval: int = typer.Option(30, "--interval"),
+              once: bool = typer.Option(False, "--once"),
+              detach: bool = typer.Option(False, "--detach")) -> None:
+    """Arranca el daemon (alias del subcomando)."""
+    from andras.ops import cli as ops
+
+    ops.run(plan, interval, once, detach)
+
+
+@ops_app.command("stop")
+def ops_stop() -> None:
+    """Para el daemon."""
+    from andras.ops import cli as ops
+
+    ops.stop()
+
+
+@ops_app.command("status")
+def ops_status() -> None:
+    """Estado del daemon."""
+    from andras.ops import cli as ops
+
+    ops.status()
+
+
+@ops_app.command("pause")
+def ops_pause(plan: str) -> None:
+    """Pausa un plan."""
+    from andras.ops import cli as ops
+
+    ops.pause(plan)
+
+
+@ops_app.command("resume")
+def ops_resume(plan: str) -> None:
+    """Reanuda un plan."""
+    from andras.ops import cli as ops
+
+    ops.resume(plan)
+
+
+@ops_app.command("abort")
+def ops_abort(plan: str) -> None:
+    """Aborta un plan."""
+    from andras.ops import cli as ops
+
+    ops.abort(plan)
+
+
+notes_app = typer.Typer(help="Diario de la campaña: añadir, buscar, exportar.")
+wallet_app = typer.Typer(help="Wallets burner → mixer → treasury.")
+net_app = typer.Typer(help="Perfiles de red, Tor y quema de infraestructura.")
+channels_app = typer.Typer(help="Correo propio: SPF/DKIM/DMARC y contexto de canales.")
+for _sub, _name in ((notes_app, "notes"), (wallet_app, "wallet"), (net_app, "net"),
+                    (channels_app, "channels")):
+    app.add_typer(_sub, name=_name)
+
+
+@notes_app.command("add")
+def notes_add(body: str, mission_id: str | None = typer.Option(None, "--mission"),
+              kind: str = typer.Option("obs", "--kind"),
+              title: str = typer.Option("", "--title")) -> None:
+    """Añade una nota al diario."""
+    from andras.store import db, notes
+
+    config = _config()
+    mission = _mission(config, mission_id)
+    with db.session(config) as conn:
+        note = notes.add(conn, mission.id, body, kind=kind, title=title)
+    console.print(f"Nota #{note.id} guardada.")
+
+
+@notes_app.command("list")
+def notes_list(mission_id: str | None = typer.Option(None, "--mission")) -> None:
+    """Lista el diario, lo más reciente primero."""
+    from andras.store import db, notes
+
+    config = _config()
+    mission = _mission(config, mission_id)
+    with db.readonly(config) as conn:
+        rows = [[n.created_at, n.kind, n.title or "—", n.body_md[:60]]
+                for n in notes.for_mission(conn, mission.id)]
+    _table("Diario", ["fecha", "tipo", "título", "texto"], rows)
+
+
+@notes_app.command("search")
+def notes_search(query: str, mission_id: str | None = typer.Option(None, "--mission")) -> None:
+    """Busca en el diario."""
+    from andras.store import db, notes
+
+    config = _config()
+    mission = _mission(config, mission_id)
+    with db.readonly(config) as conn:
+        rows = [[n.id, n.created_at, n.body_md[:100]]
+                for n in notes.search(conn, mission.id, query)]
+    _table(f"Coincidencias: {query}", ["id", "fecha", "texto"], rows)
+
+
+@notes_app.command("export")
+def notes_export(mission_id: str | None = typer.Option(None, "--mission")) -> None:
+    """Copia el diario en HTML estático."""
+    from andras.store import db, notes
+
+    config = _config()
+    mission = _mission(config, mission_id)
+    with db.session(config) as conn:
+        path = notes.export_html(conn, mission.id)
+    console.print(f"Diario exportado: {path}")
+
+
+@wallet_app.command("new")
+def wallet_new(chain: str = typer.Option(..., "--chain"),
+               role: str = typer.Option("burner", "--role"),
+               mission_id: str | None = typer.Option(None, "--mission")) -> None:
+    """Crea una wallet para la campaña."""
+    from andras import wallet
+    from andras.store import db
+
+    config = _config()
+    mission = _mission(config, mission_id)
+    with db.session(config) as conn:
+        created = wallet.create(conn, mission.id, chain=chain, role=role, config=config)
+    console.print(f"Wallet {created.id} {chain}/{role}: {created.address}")
+
+
+@wallet_app.command("list")
+def wallet_list(mission_id: str | None = typer.Option(None, "--mission")) -> None:
+    """Lista las wallets de la campaña."""
+    from andras import wallet
+    from andras.store import db
+
+    config = _config()
+    mission = _mission(config, mission_id)
+    with db.readonly(config) as conn:
+        rows = [[w.id, w.chain, w.role, w.address, "sí" if w.burned else "no"]
+                for w in wallet.for_mission(conn, mission.id)]
+    _table("Wallets", ["id", "cadena", "rol", "dirección", "quemada"], rows)
+
+
+@net_app.command("show")
+def net_show() -> None:
+    """Perfil de red efectivo."""
+    from andras import net
+
+    console.print(net.describe(_config()))
+
+
+@net_app.command("set")
+def net_set(mode: str = typer.Option(..., "--mode"),
+            doh: str = typer.Option("", "--doh"),
+            proxy: str = typer.Option("", "--proxy"),
+            jitter: int = typer.Option(0, "--jitter")) -> None:
+    """Cambia el perfil de red global en config.json."""
+    import json as json_mod
+
+    from andras.core import ROOT
+
+    config = _config()
+    net_block = config.setdefault("net", {})
+    net_block["default_profile"] = mode
+    if doh:
+        net_block["doh_url"] = doh
+    if proxy:
+        net_block["proxy_url"] = proxy
+    if jitter:
+        net_block["jitter_ms"] = jitter
+    (ROOT / "config.json").write_text(json_mod.dumps(config, indent=2, ensure_ascii=False) + "\n")
+    console.print("perfil de red actualizado")
+
+
+@net_app.command("burn")
+def net_burn(mission_id: str | None = typer.Option(None, "--mission")) -> None:
+    """Quema la infraestructura y personas de la campaña."""
+    from andras import net
+    from andras.store import db, personas
+
+    config = _config()
+    mission = _mission(config, mission_id)
+    with db.session(config) as conn:
+        infra = net.burn(conn, mission.id)
+        people = personas.burn(conn, mission.id)
+    console.print(f"{infra} infra y {people} personas quemadas")
+
+
+@app.command("notifications")
+def notifications_command(limit: int = typer.Option(20, "--limit")) -> None:
+    """Últimos avisos al operador y si se entregaron."""
+    from andras.store import db, notifications
+
+    config = _config()
+    with db.readonly(config) as conn:
+        rows = [[n["created_at"], n["level"], n["channel"], "sí" if n["ok"] else "no",
+                 n["body"][:60]] for n in notifications.recent(conn, limit=limit)]
+    _table("Avisos", ["fecha", "nivel", "canal", "ok", "texto"], rows)
+
+
+@channels_app.command("audit")
+def channels_audit(domain: str) -> None:
+    """Audita SPF, DKIM y DMARC del dominio de envío."""
+    from andras.agent import channel_tools
+    from andras.agent.tools import ToolContext
+    from andras.store import db
+
+    config = _config()
+    with db.session(config) as conn:
+        ctx = ToolContext(conn=conn, config=config, mission=None, run_id="cli")
+        console.print(channel_tools.dns_audit_spf_dkim_dmarc(ctx, domain)["text"])
+
+
+@channels_app.command("dkim")
+def channels_dkim(domain: str, selector: str = typer.Option("andras", "--selector")) -> None:
+    """Genera un par DKIM y muestra el TXT que hay que publicar."""
+    from andras.agent import channel_tools
+    from andras.agent.tools import ToolContext
+    from andras.store import db
+
+    config = _config()
+    with db.session(config) as conn:
+        ctx = ToolContext(conn=conn, config=config, mission=None, run_id="cli")
+        console.print(channel_tools.generate_dkim_zone(ctx, domain, selector)["text"])
 
 
 def main() -> None:

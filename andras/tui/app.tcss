@@ -68,3 +68,33 @@ ListItem.--highlight {
   border: tall #30363d;
   padding: 1 2;
 }
+
+RichLog {
+  background: #0b0e14;
+  border: tall #30363d;
+  height: 1fr;
+  min-height: 12;
+}
+
+TextArea {
+  height: 5;
+}
+
+Button.option {
+  margin: 0 1 1 0;
+}
+
+.dialog {
+  background: #161b22;
+  border: thick #58a6ff;
+  padding: 1 2;
+  width: 90%;
+  height: auto;
+  align: center middle;
+}
+
+#options {
+  height: auto;
+  max-height: 40vh;
+}
+

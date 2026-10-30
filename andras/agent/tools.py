@@ -45,6 +45,7 @@ class ToolContext:
     mission: object
     run_id: str
     log: Callable = print
+    plan_id: str = ""
     dry_run: bool = False
     ask: Callable | None = None
     seen: set[str] = field(default_factory=set)
@@ -113,6 +114,9 @@ def validate(spec: ToolSpec, args: dict) -> dict:
         expected = TYPES.get(props[key].get("type", "string"))
         if expected and not isinstance(value, expected):
             raise ToolError(f"`{key}` debe ser {props[key].get('type')}")
+        allowed = props[key].get("enum")
+        if allowed and value not in allowed:
+            raise ToolError(f"`{key}` debe ser uno de: {', '.join(map(str, allowed))}")
         if isinstance(value, str):
             value = value.strip()
         clean[key] = value

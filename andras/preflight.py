@@ -78,6 +78,10 @@ def run(config: dict | None = None) -> list[Check]:
     checks.append(Check("dominio", OK if config.get("from_domain") else WARN,
                         config.get("from_domain") or "sin dominio propio: entrega sólo local",
                         "define `from_domain` y su zona SPF/DKIM"))
+    checks.append(Check("buscador", OK if config.get("searxng_url") else WARN,
+                        config.get("searxng_url") or "sin SearXNG: la búsqueda web es frágil",
+                        "levanta SearXNG (docker run -p 8888:8080 searxng/searxng) y pon "
+                        "`searxng_url` en config.json"))
     checks.append(Check("avisos", OK if _notify_ready(config) else WARN,
                         _notify_detail(config), "configura el bloque `notify`"))
     checks.append(Check("textual", OK if _importable("textual") else FAIL,

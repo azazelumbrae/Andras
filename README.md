@@ -36,6 +36,26 @@ andras tools        # herramientas registradas del agente
 El wizard escribe en las mismas tablas que el CLI, así que un plan creado a mano se puede
 seguir en la interfaz y al contrario.
 
+## Agente
+
+El agente investiga y propone el plan; el humano lo revisa y confirma. Desde el wizard
+(`andras`) o por terminal:
+
+```sh
+andras agent --mission <id> [--auto] [--steps 20]   # recon + plan, sin enviar
+andras plan confirm <plan_id>                       # consentimiento de sus pasos
+andras run start --detach                           # daemon de ejecución
+andras run status|stop|pause|resume|abort <plan_id>
+```
+
+El plan confirmado autoriza los envíos de sus pasos. El gasto por encima de 0,25 USD y las
+acciones administrativas siguen preguntando. Topes por defecto: 40 pasos, 300k tokens, 3 USD
+y 0,001 BTC (testnet). Se cambian con `set_budget` o en `config.json`.
+
+Avisos por escritorio y Telegram (`notify` en config): `hit` cuando cae el objetivo,
+`critical` si un paso agota reintentos. El diario de la misión queda en
+`data/missions/<id>/journal.md` y se exporta con `andras notes export`.
+
 ## Ciclo de una misión
 
 ```sh
@@ -89,6 +109,13 @@ adapta sola al silencio de la víctima.
 | `debrief` | informe de misión en markdown |
 | `packs --validate` | comprobar los packs de técnicas |
 | `tui` | interfaz de terminal |
+| `agent` | recon y plan conducidos por el agente |
+| `plan confirm/list` | confirmar el consentimiento o listar planes |
+| `run start/stop/status/pause/resume/abort` | daemon de ejecución |
+| `notes add/list/search/export` | diario de la campaña |
+| `wallet new/list` | burner, mixer y treasury |
+| `net show/set/burn` | perfiles de red y quema de infraestructura |
+| `channels audit/dkim` | SPF/DKIM/DMARC del dominio de envío |
 | `preview/send/serve/report` | entrenamiento v1 |
 
 ## Evidencia
@@ -110,6 +137,8 @@ completitud fuerza el artefacto entero.
 
 - El servidor escucha en local y no habilita TLS.
 - Tokens opacos por campaña; el formulario guarda usuario y contraseña en SQLite.
+- Los webhooks exigen HMAC-SHA256 si defines `hook_secret`; sin él se aceptan en claro.
+- Las semillas de wallet viven en `data/andras.sqlite3`: laboratorio, no producción.
 - `authorized_recipients` acota el entrenamiento v1; en misiones el alcance es el objetivo.
 - `config.json`, `data/` y los snapshots están fuera de Git: contienen datos del objetivo.
 - Usa el proyecto solo en ejercicios propios y autorizados.

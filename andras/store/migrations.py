@@ -381,4 +381,7 @@ MIGRATIONS = [
     "CREATE INDEX IF NOT EXISTS idx_events_name ON events(event);",
     # 19 — búsqueda de notas (FTS5 si el binario lo trae)
     _notes_fts,
+    # 20 — semilla de las wallets burner (BIP39) y red
+    _ensure_columns("wallets", {"mnemonic": "TEXT NOT NULL DEFAULT ''",
+                                "network": "TEXT NOT NULL DEFAULT 'testnet'"}),
 ]

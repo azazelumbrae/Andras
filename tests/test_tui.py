@@ -3,6 +3,8 @@ import asyncio
 import pytest
 
 from andras import preflight
+from andras.agent import clarify as clarify_mod
+from andras.agent.loop import LoopResult
 from andras.tui import app as tui_app
 
 pytest.importorskip("textual")
@@ -18,6 +20,11 @@ def wired(monkeypatch, tmp_path):
     ])
     monkeypatch.setattr(preflight, "probe_models", lambda config: [
         {"provider": "ollama", "model": "test", "local": True, "ok": True, "detail": ""}])
+    monkeypatch.setattr(tui_app.clarify_mod, "generate",
+                        lambda config, mission, answers=None: clarify_mod.FALLBACK[:4])
+    monkeypatch.setattr(tui_app.runner, "seed", lambda *a, **k: {})
+    monkeypatch.setattr(tui_app.runner, "recon",
+                        lambda ctx, policy, answers=None: LoopResult("done"))
     return config
 
 
@@ -53,7 +60,16 @@ def test_wizard_reaches_summary(wired):
             app.screen.query_one("#goal").text = "que abra el enlace de la landing"
             app.screen._commit()
             await pilot.pause()
-            assert app.screen.__class__.__name__ == "ResumenScreen"
+            assert app.screen.__class__.__name__ == "ClarifyScreen"
+            for _ in range(4):
+                app.screen._answer("sí")
+                await pilot.pause()
+            for _ in range(20):
+                await pilot.pause()
+                if app.screen.__class__.__name__ == "ReviewScreen":
+                    break
+            assert app.screen.__class__.__name__ == "ReviewScreen"
+            assert app.state.intent["plan_id"]
             assert app.state.mission_id
             await pilot.press("ctrl+q")
 
