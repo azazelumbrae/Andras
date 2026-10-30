@@ -7,7 +7,7 @@ Local-first: nada sale sin una puerta humana.
 Sustituye al simulador de concienciación de la v1, que sigue disponible como entrenamiento
 rápido (`preview`, `send`, `serve`, `report`).
 
-Diseño: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Diseño: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Operación: [docs/OPERACION.md](docs/OPERACION.md).
 
 ## Instalación
 
