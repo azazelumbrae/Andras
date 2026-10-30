@@ -1,6 +1,6 @@
 """Esquema SQLite de ANDRAS v2 (misiones OSINT -> ataques)."""
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .core import database
@@ -80,7 +80,7 @@ def connect(config):
 
 
 def now():
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def add_artifact(conn, mission_id, kind, key, value, source, confidence=50):

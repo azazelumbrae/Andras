@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>{{ title }}</title><style>
+body { font: 18px system-ui; max-width: 680px; margin: 12vh auto; padding: 24px;
+       background: #10131a; color: #eef; }
+main { background: #1b2230; padding: 32px; border-radius: 16px; }
+button { padding: 12px 18px; margin: 12px 8px 0 0; cursor: pointer; }
+input { display: block; width: 100%; padding: 10px; margin: 8px 0; border-radius: 8px;
+        border: 1px solid #3a4356; background: #0d1117; color: #eef; }
+label { font-size: 14px; color: #9aa; }
+</style></head><body><main>
+<h1>{{ title }}</h1>
+<p>{{ message }}</p>
+{% if capture %}
+<form method="post">
+  <label>Correo</label><input name="username" autocomplete="off">
+  <label>Contraseña</label><input name="secret" type="password" autocomplete="off">
+  <button name="action" value="submitted">Entrar</button>
+</form>
+{% endif %}
+<h2>Señales de este ejercicio</h2>
+<ul>{% for signal in signals %}<li>{{ signal }}</li>{% endfor %}</ul>
+<form method="post">
+  <button name="action" value="reported">Marqué el mensaje como sospechoso</button>
+  <button name="action" value="continue">Continuar ejercicio</button>
+</form>
+</main></body></html>

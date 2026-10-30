@@ -13,10 +13,27 @@
   "port": 8765,
   "base_url": "http://127.0.0.1:8765",
   "database": "data/andras.sqlite3",
-  "osint_toolkit": "/Users/alvarosouza/OSINT",
-  "deepseek_api_key_env": "ANDRAS_DEEPSEEK_API_KEY",
-  "deepseek_base_url": "https://api.deepseek.com",
-  "deepseek_model": "deepseek-chat",
-  "max_pages_per_mission": 14,
-  "require_confirmation": true
+  "capture_credentials": true,
+  "osint_toolkit": "",
+  "recon_delay": 1.5,
+  "recon_budget_seconds": 420,
+  "recon_max_pages": 8,
+  "llm": {
+    "provider": "deepseek",
+    "timeout": 180,
+    "providers": {
+      "deepseek": {
+        "api_key_env": "ANDRAS_DEEPSEEK_API_KEY",
+        "model": "deepseek-chat"
+      },
+      "ollama": {
+        "base_url": "http://127.0.0.1:11434/v1",
+        "model": "qwen2.5:14b"
+      }
+    },
+    "phase_models": {
+      "plan": { "provider": "deepseek" },
+      "dossier": { "provider": "deepseek" }
+    }
+  }
 }

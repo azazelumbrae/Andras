@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><title>{{ subject }}</title>
+<style>{% include "email.css.j2" %}</style></head>
+<body><div class="card">
+<div class="banner">{{ subject }}</div>
+{% for paragraph in body.split("\n\n") %}<p>{{ paragraph.strip().replace("{tracking_url}", "") }}</p>
+{% endfor %}
+<p><a class="cta" href="{tracking_url}">Abrir notificación</a></p>
+</div></body></html>

@@ -5,7 +5,8 @@ Solo email y SMS viajan de verdad; los demás son guiones accionables.
 """
 import json
 
-from . import db, dossier as dossier_mod, llm
+from . import db, llm
+from . import dossier as dossier_mod
 
 STRATEGY_PROMPT = """Eres un planificador de ingeniería social estilo Lapsus$: directo, creativo,
 obsesivo con la verosimilitud y minimalista en tecnología. Solo vectores simples y humanos:

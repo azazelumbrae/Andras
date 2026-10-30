@@ -1,57 +1,81 @@
 # ANDRAS
 
-Simulador personal de ejercicios de ingeniería social. Envía mensajes de práctica por SMTP a destinatarios que tú autorizas, sirve una página de entrenamiento y registra interacciones sin recoger contraseñas.
+Emulador de adversario para **un objetivo humano**. Recon OSINT dirigido, dossier con
+procedencia, pretexto generado con técnicas de red team de LLM y entrega multicanal.
+Local-first: nada sale sin una puerta humana.
 
-ANDRAS v1 es local-first y usa solo la biblioteca estándar de Python 3.11+. No envía nada durante `preview`; el envío real requiere destinatarios presentes en `config.json` y confirmación interactiva.
+Sustituye al simulador de concienciación de la v1, que sigue disponible como entrenamiento
+rápido (`preview`, `send`, `serve`, `report`).
 
-## Inicio rápido
+Diseño: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-```sh
-cd ~/andras
-cp config.example.json config.json
-# Mailinator es una bandeja pública de prueba; no uses datos sensibles.
-export ANDRAS_SMTP_USER='tu-usuario'
-export ANDRAS_SMTP_PASSWORD='tu-contraseña-de-aplicacion'
-python3 -m andras.cli init
-python3 -m andras.cli scenarios
-python3 -m andras.cli preview suspicious-email --to andras-lab@mailinator.com
-```
-
-Mailinator sirve para recibir el mensaje de prueba; es un servicio de solo recepción y no ofrece SMTP saliente. El ejemplo autoriza `andras-lab@mailinator.com`, una bandeja pública que cualquiera puede leer. Úsala solo para mensajes ficticios y sin datos personales ni secretos.
-
-El remitente sigue necesitando un SMTP saliente real. Configura host, puerto y remitente en `config.json` (normalmente puerto 587 con STARTTLS o 465 con TLS implícito). Usa una contraseña de aplicación si el proveedor la requiere. No guardes secretos en archivos versionados.
-
-En una terminal, inicia el receptor local:
+## Instalación
 
 ```sh
-python3 -m andras.cli serve
+python3 -m venv .venv
+.venv/bin/pip install -e '.[dev]'
+cp config.example.json config.json     # edita SMTP, base_url y llm
+export ANDRAS_DEEPSEEK_API_KEY='...'
+.venv/bin/andras init
 ```
 
-En otra, crea y envía el ejercicio:
+Sin clave LLM el recon funciona en modo tonto (solo patrones y registros) y el dossier cae a
+agregación directa. Para no mandar el dossier fuera, usa `llm.provider: ollama`.
+
+## Ciclo de una misión
 
 ```sh
-python3 -m andras.cli send suspicious-email --to andras-lab@mailinator.com
+andras mission new --name "Ana Pérez" --role CFO --company Acme --domain acme.com \
+                   --goal "que abra el enlace y meta credenciales" --mode tracked
+andras recon   --mission <id>          # OSINT + triaje, con presupuesto
+andras dossier --mission <id>          # destila y anota procedencia
+andras hooks   --mission <id>          # propone ganchos y los puntúa
+andras hook-choose 2 --mission <id>
+andras plan    --mission <id> --channel email
+andras critic  --mission <id>          # auditoría adversarial antes de gastar el envío
+andras build   <attack_id>             # render + QA
+andras deliver <attack_id> --to ana@acme.com
+andras serve                           # landing y captura (terminal aparte)
 ```
 
-El correo enlaza a `http://127.0.0.1:8765`; solo podrás abrirlo desde el mismo equipo. No expongas este servidor a Internet. Para probar desde otro dispositivo en tu red, cambia `base_url` a una dirección privada controlada y `bind_host` a la interfaz LAN; el servidor no habilita TLS. El enlace contiene un token aleatorio que identifica una interacción, no a una persona.
-
-Consulta resultados con `python3 -m andras.cli report` o expórtalos con `python3 -m andras.cli report --format json`. La base SQLite se crea en `data/andras.sqlite3`.
-
-## Seguridad y privacidad
-
-- Los destinatarios deben estar enumerados explícitamente en `authorized_recipients`.
-- El CLI vuelve a comprobar el alcance y pide escribir `SEND` antes de transmitir cada campaña.
-- La plantilla no solicita credenciales. ANDRAS no registra campos de formulario ni contenido de correo.
-- Configuración, base de datos y secretos locales están excluidos de Git.
-- Usa el proyecto solo en ejercicios propios y autorizados. No importes listas de contactos ni redirijas los mensajes a terceros.
+Cada fase escribe en SQLite y la siguiente se niega a correr sin material. `deliver` pide
+`SEND` salvo que exista `ANDRAS_YES=1`.
 
 ## Comandos
 
-- `init`: crea base de datos y configuración si falta.
-- `scenarios`: lista escenarios incluidos.
-- `preview <scenario> --to <email>`: renderiza el correo sin enviar.
-- `serve`: inicia la página local y endpoint de eventos.
-- `send <scenario> --to <email>`: envía una campaña SMTP real tras confirmación.
-- `report [--format text|json]`: resume eventos locales.
+| Comando | Qué hace |
+|---|---|
+| `mission new/list/show/status` | ciclo de vida de la misión |
+| `recon` | colectores OSINT + triaje de páginas |
+| `dossier` | dossier estructurado con `artifact_id` por afirmación |
+| `hooks` / `hook-choose` | ganchos ordenados por dolor × verificabilidad |
+| `plan` | vectores encadenados con guiones completos |
+| `critic` | contradicciones, huecos y datos asesinos |
+| `build` | render por canal y control de calidad |
+| `deliver` | envío real y registro |
+| `packs --validate` | comprobar los packs de técnicas |
+| `tui` | interfaz de terminal |
+| `preview/send/serve/report` | entrenamiento v1 |
 
-El escenario de ejemplo es deliberadamente ficticio y muestra una página educativa al hacer clic. “Reportar” registra la acción en la página; la integración con buzones o botones reales de reporte queda fuera de v1.
+## Evidencia
+
+Un dato vale lo que valen sus fuentes. Cada artifact guarda URL, snapshot con hash, fecha y
+confianza. Dos dominios independientes lo marcan `corroborated`; lo que solo dijo el LLM se
+queda `inferred` y nunca sostiene un gancho por sí solo. Nada de "smoking guns": tres pruebas
+pasivas y verificables antes que un hallazgo espectacular sin contrastar.
+
+## Técnicas
+
+Los frameworks de [unjail.ai](https://www.unjail.ai/how-jailbreaking-works) viven en
+`prompts/packs/`, en YAML versionado: cadena de 7 turnos (reconocimiento, inteligencia de
+proceso, pretexto, credibilidad, urgencia, autoridad, finisher), más Dark Psychology,
+Crescendo y DRA como capas de prompt. El pack elegido se inyecta en el plan y el contrato de
+completitud fuerza el artefacto entero.
+
+## Seguridad
+
+- El servidor escucha en local y no habilita TLS.
+- Tokens opacos por campaña; el formulario guarda usuario y contraseña en SQLite.
+- `authorized_recipients` acota el entrenamiento v1; en misiones el alcance es el objetivo.
+- `config.json`, `data/` y los snapshots están fuera de Git: contienen datos del objetivo.
+- Usa el proyecto solo en ejercicios propios y autorizados.

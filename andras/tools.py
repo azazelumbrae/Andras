@@ -24,7 +24,7 @@ def run_tool(config, tool, args, timeout=TIMEOUT):
         return False, f"herramienta no disponible: {tool}"
     try:
         proc = subprocess.run(
-            [binary, *args], capture_output=True, text=True, timeout=timeout,
+            [binary, *args], capture_output=True, text=True, timeout=timeout, check=False,
             cwd=root, env={**os.environ, "NO_COLOR": "1"},
         )
     except subprocess.TimeoutExpired:
@@ -47,8 +47,8 @@ def http_get(url, headers=None, timeout=20, max_bytes=400_000):
 
 
 def html_to_text(html):
-    text = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", html, flags=re.S | re.I)
-    text = re.sub(r"<(br|/p|/div|/li|/h[1-6]|/tr)[^>]*>", "\n", text, flags=re.I)
+    text = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", html, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r"<(br|/p|/div|/li|/h[1-6]|/tr)[^>]*>", "\n", text, flags=re.IGNORECASE)
     text = re.sub(r"<[^>]+>", " ", text)
     text = re.sub(r"&nbsp;?", " ", text)
     text = re.sub(r"[ \t]+", " ", text)
@@ -91,7 +91,7 @@ def smtp_send(config, to, subject, body, html_body=None):
 
 def whois_summary(domain):
     try:
-        proc = subprocess.run(["whois", domain], capture_output=True, text=True, timeout=25)
+        proc = subprocess.run(["whois", domain], capture_output=True, text=True, timeout=25, check=False)
     except Exception as exc:
         return False, str(exc)
     if proc.returncode != 0:
@@ -108,7 +108,7 @@ def dns_records(domain):
     for rtype in ("MX", "TXT", "A", "NS"):
         try:
             proc = subprocess.run(["dig", "+short", rtype, domain], capture_output=True,
-                                  text=True, timeout=15)
+                                  text=True, timeout=15, check=False)
             values = [l for l in proc.stdout.splitlines() if l.strip()]
             if values:
                 out[rtype] = values[:12]
@@ -123,7 +123,7 @@ def duckduckgo(query, limit=8):
     if not ok:
         return []
     results = []
-    for block in re.findall(r'class="result__a"[^>]*href="([^"]+)"[^>]*>(.*?)</a>', html, re.S)[:limit]:
+    for block in re.findall(r'class="result__a"[^>]*href="([^"]+)"[^>]*>(.*?)</a>', html, re.DOTALL)[:limit]:
         raw_url, title = block
         title = re.sub(r"<[^>]+>", "", title).strip()
         if raw_url.startswith("//duckduckgo.com/l/?uddg="):
@@ -153,4 +153,4 @@ def owned_domains(name, limit=10):
     return sorted(domains.items(), key=lambda kv: kv[1], reverse=True)[:limit]
 
 
-import urllib.parse  # noqa: E402  (usado por duckduckgo)
+import urllib.parse

@@ -1,0 +1,32 @@
+id: mfa-push-fatigue
+name: THE NEW-PHONE MFA MIGRATION REQUEST
+channel: phone
+strength: A
+purpose: >-
+  Instalar una oleada de aprobaciones MFA con una cobertura telefónica que las justifique,
+  hasta que el objetivo apruebe una.
+leverage_requires: [target_name, target_phone]
+mappings: [MFA fatigue, push bombing, identity provider]
+turn_budget: 7
+turns:
+  - role: reconnaissance
+    goal: presentarse como seguridad de identidad y describir una sesión sospechosa
+    success: el objetivo reconoce el aviso
+  - role: process_intel
+    goal: explicar el flujo de migración de dispositivo y qué verá en pantalla
+    success: el objetivo entiende que recibirá avisos
+  - role: pretext
+    goal: anunciar el envío de la primera aprobación
+    success: el objetivo dice que le ha llegado
+  - role: credibility
+    goal: dar detalle exacto del dispositivo y la hora de la sesión
+    success: el objetivo confía en que es su cuenta
+  - role: urgency
+    goal: avisar de que hay varias pendientes y que la sesión caduca
+    success: el objetivo aprueba o pregunta cuál aprobar
+  - role: authority
+    goal: indicar que apruebe solo la del navegador indicado
+    success: el objetivo aprueba otra por error
+  - role: finisher
+    goal: confirmar el acceso y pedir el código si quedo pendiente
+    success: el atacante entra con sesión válida

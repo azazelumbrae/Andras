@@ -186,25 +186,30 @@ de lógica en los routers.
 
 ## 7. Roadmap
 
-| Fase | Entrega | Criterio de "hecho" |
-|---|---|---|
-| 0 | repo sano: git, tests, `pyproject`, CI local | `pytest` verde, primer commit |
-| 1 | store + intake + dossier con procedencia | misión creada, artifacts con fuente y confianza |
-| 2 | recon real (5 colectores) | dossier poblado desde 1 email/dominio |
-| 3 | brain + packs + validador | plan de 2 vectores con guiones completos |
-| 4 | artefactos + landing con tracking | correo real enviado y visita registrada |
-| 5 | crítico adversarial + debrief | informe de misión exportable |
-| 6 | canales interactivos (Telegram, SMS) | respuesta de la víctima registrada |
-| 7 | captura de credenciales opcional | formulario + OTP |
+| Fase | Entrega | Criterio de "hecho" | Estado |
+|---|---|---|---|
+| 0 | repo sano: git, tests, `pyproject`, CI local | `pytest` verde, primer commit | hecho |
+| 1 | store + intake + dossier con procedencia | misión creada, artifacts con fuente y confianza | hecho |
+| 2 | recon real (5 colectores) | dossier poblado desde 1 email/dominio | hecho, sin red probada |
+| 3 | brain + packs + validador | plan de 2 vectores con guiones completos | hecho |
+| 4 | artefactos + landing con tracking | correo real enviado y visita registrada | hecho, falta envío real |
+| 5 | crítico adversarial + debrief | informe de misión exportable | crítico hecho, debrief pendiente |
+| 6 | canales interactivos (Telegram, SMS) | respuesta de la víctima registrada | envío hecho, respuesta pendiente |
+| 7 | captura de credenciales opcional | formulario + OTP | formulario hecho, OTP pendiente |
 
 Fase 0 y 1 son requisito de todo lo demás.
 
 ---
 
-## 8. Decisiones abiertas
+## 8. Decisiones cerradas
 
-- Stack de UI (FastAPI+HTMX vs Next.js).
-- Proveedor LLM y si se soporta local (Ollama) para no mandar el dossier fuera.
-- Canales del primer corte.
-- Captura de credenciales: no / formulario / proxy inverso tipo Evilginx.
-- Multiusuario o single-user.
+| Decisión | Elegido | Consecuencia |
+|---|---|---|
+| Interfaz | **CLI + TUI** (Typer + Rich/Textual), servidor solo para la landing | sin SPA; todo caso de uso es un comando |
+| LLM | **multi-proveedor**, DeepSeek por defecto, modelo por fase | un solo cliente compatible OpenAI; Ollama entra como proveedor más |
+| Canales | email, landing, hoja de llamada, Telegram, SMS, WhatsApp y los que hagan falta | cada canal es un adaptador con la misma interfaz |
+| Credenciales | **formulario simple** en la landing | usuario/contraseña a SQLite, sin proxy |
+| Usuarios | single-user local | sin auth salvo token de misión |
+
+La landing se sirve igual porque es parte del canal, no de la UI: el operador vive en la
+terminal.

@@ -1,7 +1,7 @@
 import json
 import secrets
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -34,14 +34,14 @@ def database(config):
 
 def record(conn, campaign_id, event):
     conn.execute("INSERT INTO events(campaign_id,event,occurred_at) VALUES(?,?,?)",
-                 (campaign_id, event, datetime.now(timezone.utc).isoformat()))
+                 (campaign_id, event, datetime.now(UTC).isoformat()))
     conn.commit()
 
 
 def new_campaign(conn, scenario, recipient_hash):
     campaign = secrets.token_urlsafe(24)
     conn.execute("INSERT INTO campaigns(id,scenario,recipient_hash,created_at) VALUES(?,?,?,?)",
-                 (campaign, scenario, recipient_hash, datetime.now(timezone.utc).isoformat()))
+                 (campaign, scenario, recipient_hash, datetime.now(UTC).isoformat()))
     conn.commit()
     return campaign
 

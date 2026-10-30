@@ -1,0 +1,32 @@
+id: lost-laptop-replacement
+name: THE LOST-LAPTOP REPLACEMENT PRETEXT
+channel: email
+strength: S
+purpose: >-
+  Un empleado remoto dice haber perdido el portátil de la empresa viajando y necesita
+  un dispositivo nuevo enrolado antes de su próxima sesión.
+leverage_requires: [target_name, target_company, recovery_fact]
+mappings: [lost laptop, device enrollment, urgency, remote employee]
+turn_budget: 7
+turns:
+  - role: reconnaissance
+    goal: abrir con el contexto del objetivo y no revelar el pedido final
+    success: el objetivo confirma quién es y su contexto de trabajo
+  - role: process_intel
+    goal: mapear cómo se enrola un equipo y quién lo aprueba
+    success: el objetivo nombra el procedimiento o lo deriva
+  - role: pretext
+    goal: fijar el rol de empleado en viaje con un motivo creíble
+    success: el objetivo acepta el motivo sin pedir más pruebas
+  - role: credibility
+    goal: reforzar con detalle interno que solo un compañero conocería
+    success: el objetivo baja la guardia y aporta un dato más
+  - role: urgency
+    goal: introducir la próxima sesión de trabajo como plazo
+    success: el objetivo propone acelerar
+  - role: authority
+    goal: puentear autoridad y ofrecer ayuda concreta
+    success: el objetivo se compromete a una acción
+  - role: finisher
+    goal: pedir el artefacto completo (alta, enlace de enrolamiento, clave temporal)
+    success: el objetivo entrega el acceso o lo ejecuta

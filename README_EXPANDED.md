@@ -1,73 +1,24 @@
-# ANDRAS - Expansión de Proyecto de Ingeniería Social
+# ANDRAS — notas de expansión
 
-## 📋 Resumen del Proyecto Expandido
+La v1 era un simulador de concienciación por SMTP. La v3 lo convierte en emulador de
+adversario completo: OSINT real, dossier con procedencia, ganchos puntuados, planes
+multi-turno y entrega multicanal.
 
-Este documento describe las modificaciones realizadas al proyecto ANDRAS para convertirlo en una herramienta más completa de simulación de ingeniería social.
+El detalle operativo está en `README.md`; el diseño y las decisiones, en
+`docs/ARCHITECTURE.md`. La correspondencia con los módulos antiguos está en
+`docs/DEPRECATED.md`.
 
-### 🎯 Objetivos Principales
+Estado actual:
 
-1. **Herramientas de OSINT** - Recopilar información sobre víctimas
-2. **Phishing** - Simulación de ataques de correo electrónico
-3. **Extorsión** - Modelado de amenazas y coacción
-4. **Manipulación Social** - Creación de perfiles falsos
-5. **Baneos Automáticos** - Simulación de sistemas que bloquean cuentas
-
-### 📁 Estructura del Proyecto
-
-```
-andras/
-├── README.md              # Documentación original
-├── README_EXPANDED.md    # Esta documentación
-├── config.json            # Configuración SMTP y destinatarios
-├── scenarios/
-│   ├── suspicious-email.json      # Escenario original
-│   ├── osint-discover.json        # Recopilar información OSINT
-│   ├── phishing-spear.json        # Phishing dirigido
-│   ├── extortion-bec.json          # Extorsión por BEC (Business Email Compromise)
-│   ├── social-bot-fake.json       # Creación de perfiles falsos
-│   └── ban-account.json           # Bloqueo automático de cuentas
-├── cli.py                 # CLI principal con nuevas subcomandos
-├── server.py              # Servidor web
-└── core.py                # Lógica central
-```
-
-### 🚀 Nuevas Comandos del CLI
-
-| Comando | Descripción |
-|---------|-------------|
-| `osint-discover <to>` | Preview escenario de OSINT |
-| `phishing-spear <to>` | Preview escenario de phishing |
-| `extortion-bec <to>` | Preview escenario de extorsión |
-| `social-bot-fake <to>` | Preview escenario de bots sociales |
-| `ban-account <to>` | Preview escenario de baneos |
-
-### 🔧 Configuración
-
-Edita `config.json` para configurar:
-- SMTP host/port/seguridad
-- Destinatarios autorizados
-- URL base del servidor local
-
-### 📊 Escenarios Incluidos
-
-1. **OSINT Discovery** - Recopilar datos públicos sobre una persona
-2. **Spear Phishing** - Ataque dirigido con correo falso y enlaces sospechosos
-3. **Extortion BEC** - Amenaza financiera mediante compromiso de cuentas bancarias
-4. **Social Bot Fake** - Creación de perfiles falsos para manipular opiniones
-5. **Ban Account** - Simulación de sistemas que detectan patrones de comportamiento
-
-### 🛡️ Seguridad y Ética
-
-Este proyecto está diseñado exclusivamente para:
-- **Ejercicios educativos** en entornos controlados
-- **Entrenamiento de equipos de seguridad**
-- **Simulación de ataques** para pruebas de defensa
-
-**No utilice esta herramienta para:**
-- Ataques contra personas sin autorización
-- Colectas de datos sin permiso
-- Manipulación de redes sociales no autorizadas
-
----
-
-*Documentación generada por el sistema de desarrollo ANDRAS v1.0*
+- [x] store con migraciones, misiones, artifacts, ganchos, ataques, entregas
+- [x] confianza y corroboración por dominios independientes
+- [x] proveedor LLM multi-proveedor con failover y modelo por fase
+- [x] packs de técnicas en YAML y validador
+- [x] colectores: dorks, crt.sh, DNS, whois, GitHub, patrones de correo
+- [x] dossier, ganchos, plan, crítico adversarial
+- [x] render por canal, QA y entrega SMTP/Telegram/Twilio/manual
+- [x] landing con formulario y captura
+- [ ] lotes de varios vectores por misión
+- [ ] bot conversacional para Telegram (respuesta adaptativa)
+- [ ] informe de misión exportable
+- [ ] proxy inverso tipo Evilginx

@@ -1,0 +1,32 @@
+id: account-lockout-callback
+name: THE ACCOUNT-LOCKOUT CALLBACK TRAP
+channel: phone
+strength: S
+purpose: >-
+  Convencer al help desk de resetear las credenciales de una cuenta privilegiada usando
+  datos de recuperación verificados y cobertura de "soporte".
+leverage_requires: [target_name, target_company, target_phone]
+mappings: [vishing, help desk, KBA, authority transfer]
+turn_budget: 7
+turns:
+  - role: reconnaissance
+    goal: situar la llamada como seguimiento de un ticket real
+    success: el agente localiza o cree localizar el ticket
+  - role: process_intel
+    goal: hacer que el agente explique qué comprueba antes de resetear
+    success: el agente enumera criterios de verificación
+  - role: pretext
+    goal: adoptar el rol de empleado con autoridad y prisa moderada
+    success: el agente acepta seguir con el trámite
+  - role: credibility
+    goal: responder a las preguntas de recuperación con los datos del dossier
+    success: el agente da por verificada la identidad
+  - role: urgency
+    goal: añadir un plazo operativo (reunión, cierre, despliegue)
+    success: el agente propone saltarse un paso
+  - role: authority
+    goal: ofrecer un correo o teléfono de contacto controlado para "cerrar"
+    success: el agente acepta el canal ofrecido
+  - role: finisher
+    goal: obtener el reset y la confirmación al canal controlado
+    success: la contraseña temporal llega al buzón del atacante
