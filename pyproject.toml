@@ -20,7 +20,7 @@ dependencies = [
 tui = ["textual>=0.70"]
 sms = ["twilio>=9.0"]
 whatsapp = ["requests>=2.31"]
-dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.5"]
+dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.5", "aiosmtpd>=1.4"]
 
 [project.scripts]
 andras = "andras.cli:main"

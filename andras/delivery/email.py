@@ -11,9 +11,12 @@ from andras.delivery.base import Result
 
 def send(*, config: dict, target: str, subject: str, body: str,
          html_body: str | None = None) -> Result:
-    user = os.environ.get(config.get("smtp_user_env", "ANDRAS_SMTP_USER"), "")
-    password = os.environ.get(config.get("smtp_password_env", "ANDRAS_SMTP_PASSWORD"), "")
-    if not user or not password:
+    user = os.environ.get(config.get("smtp_user_env", "ANDRAS_SMTP_USER"), "") or \
+        config.get("smtp_user", "")
+    password = os.environ.get(config.get("smtp_password_env", "ANDRAS_SMTP_PASSWORD"), "") or \
+        config.get("smtp_password", "")
+    needs_auth = config.get("smtp_auth", True)
+    if needs_auth and (not user or not password):
         return Result.fail("faltan credenciales SMTP en el entorno")
 
     msg = EmailMessage()
@@ -24,17 +27,20 @@ def send(*, config: dict, target: str, subject: str, body: str,
     if html_body:
         msg.add_alternative(html_body, subtype="html")
 
+    security = config.get("smtp_security", "starttls")
     try:
-        if config.get("smtp_security") == "ssl":
+        if security == "ssl":
             smtp = smtplib.SMTP_SSL(config["smtp_host"], int(config["smtp_port"]),
                                     context=ssl.create_default_context(), timeout=20)
         else:
             smtp = smtplib.SMTP(config["smtp_host"], int(config["smtp_port"]), timeout=20)
             smtp.ehlo()
-            smtp.starttls(context=ssl.create_default_context())
-            smtp.ehlo()
+            if security != "plain":
+                smtp.starttls(context=ssl.create_default_context())
+                smtp.ehlo()
         with smtp:
-            smtp.login(user, password)
+            if needs_auth:
+                smtp.login(user, password)
             smtp.send_message(msg)
     except Exception as exc:
         return Result.fail(str(exc))

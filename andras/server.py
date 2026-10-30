@@ -5,7 +5,8 @@ import html
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from andras.core import database, load_config, load_scenario, record
+from andras.core import load_config, load_scenario, record
+from andras.store import db
 
 STYLE = """body{font:18px system-ui;max-width:680px;margin:12vh auto;padding:24px;
 background:#10131a;color:#eef}main{background:#1b2230;padding:32px;border-radius:16px}
@@ -100,7 +101,7 @@ def handler_for(conn, capture: bool):
 
 def serve() -> None:
     config = load_config()
-    conn = database(config)
+    conn = db.connect(config)
     server = HTTPServer((config.get("bind_host", "127.0.0.1"), int(config.get("port", 8765))),
                         handler_for(conn, bool(config.get("capture_credentials", True))))
     print(f"ANDRAS escuchando en http://{server.server_address[0]}:{server.server_address[1]}")

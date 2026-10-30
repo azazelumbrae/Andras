@@ -12,7 +12,7 @@ def load_config():
     if not path.exists():
         raise SystemExit("Falta config.json. Ejecuta `python3 -m andras.cli init` y edita la configuración.")
     config = json.loads(path.read_text())
-    if config.get("smtp_security") not in {"starttls", "ssl"}:
+    if config.get("smtp_security") not in {"starttls", "ssl", "plain"}:
         raise SystemExit("smtp_security debe ser starttls o ssl")
     return config
 

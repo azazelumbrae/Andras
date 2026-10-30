@@ -19,6 +19,7 @@ BASE_BY_SOURCE = {
     "web": 45,
     "dork": 40,
     "social": 45,
+    "pattern": 45,
     "llm": 30,
 }
 
@@ -40,7 +41,7 @@ def base_confidence(source_kind: str, explicit: int | None = None) -> int:
 
 
 def verification_for(sources: list[str], source_kind: str) -> str:
-    if source_kind in {"llm", "pattern"} or all(s.startswith(("llm", "pattern")) for s in sources):
+    if source_kind == "llm" or all(s.startswith("llm") for s in sources):
         return "inferred"
     domains = {d for d in (source_domain(s) for s in sources) if d}
     return "corroborated" if len(domains) >= 2 else "single_source"

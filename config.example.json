@@ -28,12 +28,21 @@
       },
       "ollama": {
         "base_url": "http://127.0.0.1:11434/v1",
-        "model": "qwen2.5:14b"
+        "model": "gpt-oss:120b-cloud",
+        "needs_key": false
       }
     },
     "phase_models": {
-      "plan": { "provider": "deepseek" },
-      "dossier": { "provider": "deepseek" }
+      "plan": {
+        "provider": "deepseek"
+      },
+      "dossier": {
+        "provider": "deepseek"
+      },
+      "campaign": {
+        "provider": "deepseek"
+      }
     }
-  }
+  },
+  "smtp_auth": true
 }

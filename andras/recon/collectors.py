@@ -188,5 +188,5 @@ def email_patterns(ctx: Ctx) -> list[Finding]:
     candidates = {f"{first}.{last}", f"{first}{last}", f"{first[0]}{last}",
                   f"{first}_{last}", f"{last}.{first}"}
     return [Finding(kind="email", value=f"{candidate}@{domain}",
-                    source="pattern:nombre+dominio", source_domain=domain, confidence=35)
+                    source="pattern:nombre+dominio", source_domain=domain, confidence=45)
             for candidate in sorted(candidates)]

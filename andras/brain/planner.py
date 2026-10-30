@@ -42,40 +42,46 @@ def build_attacks(conn, config, mission, channel: str | None = None,
     chosen = hooks.chosen(conn, mission.id) or hooks.list_for(conn, mission.id)[:2]
     if not chosen:
         raise SystemExit("No hay ganchos. Ejecuta `andras hooks` primero.")
-    selected_hooks = {h.id for h in chosen}
-    arts = evidence.usable(conn, mission.id, min_confidence=40)
-    by_id = {a.id: a for a in arts}
-    # los artifacts usados deben estar corroborados: si no, el gancho es una apuesta
-    weak = [a for h in chosen for a in (by_id.get(i) for i in h.artifact_ids)
-            if a and a.verification != "corroborated"]
-    has = {a.kind for a in arts}
-
-    built: list[Vector] = []
+    has = {a.kind for a in evidence.usable(conn, mission.id, min_confidence=40)}
+    built = []
     for pack in packs.choose(channel=channel, has=has, limit=count):
-        soporte = "\n".join(f"[{a.id}] {a.kind}: {a.value}" for h in chosen
-                            for a in (by_id.get(i) for i in h.artifact_ids) if a)
-        message = [{"role": "system", "content": prompts.PLAN + provider.COMPLETENESS},
-                   {"role": "user", "content":
-                    f"Meta: {mission.goal}\nObjetivo: {mission.target_name}, "
-                    f"{mission.target_role} en {mission.target_company}\nCanal: {pack.channel}\n\n"
-                    f"{pack.as_prompt()}\n\nGANCHO: {chosen[0].title}\n"
-                    f"Por qué funciona: {chosen[0].rationale}\nSoporte:\n{soporte}"}]
-        data = provider.complete_json(config, message, phase="plan", temperature=0.7,
-                                      max_tokens=4000)
-        vector = _vector(data, pack.channel, selected_hooks)
-        if not vector:
-            continue
-        attack_id = secrets.token_urlsafe(9)
-        payload = json.dumps(_payload(vector, weak), ensure_ascii=False)
-        conn.execute("INSERT INTO attacks(id,mission_id,vector,channel,angle,leverage,stance,"
-                     "payload,script,status,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-                     (attack_id, mission.id, vector.vector, vector.channel, vector.angle,
-                      vector.leverage, vector.stance, payload, payload, "draft", db.now()))
-        vector.id = attack_id  # type: ignore[attr-defined]
-        built.append(vector)
+        vector = build_one(conn, config, mission, pack, chosen[0])
+        if vector:
+            built.append(vector)
     if not built:
         raise SystemExit("El LLM no devolvió vectores válidos")
     return built
+
+
+def build_one(conn, config, mission, pack, hook, channel: str | None = None) -> Vector | None:
+    """Genera y guarda un vector concreto para un pack y un gancho."""
+    channel = channel or pack.channel
+    arts = evidence.usable(conn, mission.id, min_confidence=40)
+    by_id = {a.id: a for a in arts}
+    weak = [a for i in hook.artifact_ids if (a := by_id.get(i))
+            and a.verification != "corroborated"]
+    soporte = "\n".join(f"[{a.id}] {a.kind}: {a.value}"
+                        for i in hook.artifact_ids if (a := by_id.get(i)))
+    message = [{"role": "system", "content": prompts.PLAN + provider.COMPLETENESS},
+               {"role": "user", "content":
+                f"Meta: {mission.goal}\nObjetivo: {mission.target_name}, "
+                f"{mission.target_role} en {mission.target_company}\nCanal: {channel}\n\n"
+                f"{pack.as_prompt()}\n\nGANCHO: {hook.title}\n"
+                f"Por qué funciona: {hook.rationale}\nSoporte:\n{soporte}"}]
+    data = provider.complete_json(config, message, phase="plan", temperature=0.7,
+                                  max_tokens=4000)
+    vector = _vector(data, channel, {hook.id})
+    if not vector:
+        return None
+    vector.channel = channel
+    attack_id = secrets.token_urlsafe(9)
+    payload = json.dumps(_payload(vector, weak), ensure_ascii=False)
+    conn.execute("INSERT INTO attacks(id,mission_id,vector,channel,angle,leverage,stance,"
+                 "payload,script,status,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                 (attack_id, mission.id, vector.vector, vector.channel, vector.angle,
+                  vector.leverage, vector.stance, payload, payload, "draft", db.now()))
+    vector.id = attack_id  # type: ignore[attr-defined]
+    return vector
 
 
 def _vector(data: dict, channel: str, hook_ids: set[int]) -> Vector | None:

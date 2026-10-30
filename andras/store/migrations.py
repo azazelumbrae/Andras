@@ -194,4 +194,31 @@ MIGRATIONS = [
                                 "stance": "TEXT NOT NULL DEFAULT ''",
                                 "payload": "TEXT NOT NULL DEFAULT '{}'",
                                 "script": "TEXT NOT NULL DEFAULT ''"}),
+    # 12 — campañas omnicanal
+    """
+    CREATE TABLE IF NOT EXISTS plans (
+      id TEXT PRIMARY KEY,
+      mission_id TEXT NOT NULL REFERENCES missions(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      narrative TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'draft',
+      created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS plan_steps (
+      id INTEGER PRIMARY KEY,
+      plan_id TEXT NOT NULL REFERENCES plans(id) ON DELETE CASCADE,
+      position INTEGER NOT NULL,
+      channel TEXT NOT NULL,
+      pack_id TEXT NOT NULL DEFAULT '',
+      attack_id TEXT,
+      delay_hours REAL NOT NULL DEFAULT 0,
+      trigger TEXT NOT NULL DEFAULT 'always',
+      why TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'pending',
+      started_at TEXT,
+      ended_at TEXT,
+      UNIQUE (plan_id, position)
+    );
+    CREATE INDEX IF NOT EXISTS idx_plan_steps ON plan_steps(plan_id, position);
+    """,
 ]

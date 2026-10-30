@@ -31,15 +31,33 @@ andras recon   --mission <id>          # OSINT + triaje, con presupuesto
 andras dossier --mission <id>          # destila y anota procedencia
 andras hooks   --mission <id>          # propone ganchos y los puntúa
 andras hook-choose 2 --mission <id>
-andras plan    --mission <id> --channel email
+andras campaign plan --mission <id> --channels email,sms,phone --length 4
+andras campaign show <plan_id>         # revisa la secuencia completa
+andras campaign run  <plan_id> --to ana@acme.com
 andras critic  --mission <id>          # auditoría adversarial antes de gastar el envío
-andras build   <attack_id>             # render + QA
+andras build   <attack_id>             # render + QA de un vector suelto
 andras deliver <attack_id> --to ana@acme.com
+andras debrief --mission <id>          # informe en data/reports
 andras serve                           # landing y captura (terminal aparte)
 ```
 
-Cada fase escribe en SQLite y la siguiente se niega a correr sin material. `deliver` pide
-`SEND` salvo que exista `ANDRAS_YES=1`.
+Cada fase escribe en SQLite y la siguiente se niega a correr sin material. `deliver` y
+`campaign run` piden `SEND` por cada envío salvo que exista `ANDRAS_YES=1`.
+
+## Campaña omnicanal
+
+`campaign plan` es el corazón del producto: el LLM recibe la meta, el gancho con su soporte y
+el catálogo de packs, y devuelve una secuencia de 3 a 6 pasos con canal, pack, espera y
+disparador. Los disparadores son `always`, `no_visit`, `visited`, `no_reply` y `no_submit`:
+el siguiente golpe solo sale si el anterior no consiguió su objetivo, así que la campaña se
+adapta sola al silencio de la víctima.
+
+- cada paso se genera con su propio guion completo, ligado al mismo gancho y a los mismos
+  artifact ids;
+- `campaign show` imprime la secuencia entera antes de enviar nada;
+- `campaign run --skip-wait` recorre sin esperar y `--resume` retoma donde quedó;
+- si un adaptador no tiene credenciales (Twilio, SMTP) el envío se marca `failed` y la
+  terminal imprime el texto y el enlace con token para mandarlo a mano.
 
 ## Comandos
 
@@ -49,10 +67,12 @@ Cada fase escribe en SQLite y la siguiente se niega a correr sin material. `deli
 | `recon` | colectores OSINT + triaje de páginas |
 | `dossier` | dossier estructurado con `artifact_id` por afirmación |
 | `hooks` / `hook-choose` | ganchos ordenados por dolor × verificabilidad |
-| `plan` | vectores encadenados con guiones completos |
+| `plan` | vectores sueltos de un canal |
+| `campaign plan/show/run` | secuencia omnicanal con disparadores |
 | `critic` | contradicciones, huecos y datos asesinos |
 | `build` | render por canal y control de calidad |
 | `deliver` | envío real y registro |
+| `debrief` | informe de misión en markdown |
 | `packs --validate` | comprobar los packs de técnicas |
 | `tui` | interfaz de terminal |
 | `preview/send/serve/report` | entrenamiento v1 |

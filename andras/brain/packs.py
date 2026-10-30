@@ -83,9 +83,17 @@ def _parse(path: Path) -> Pack:
                 mappings=list(data.get("mappings", [])), path=str(path))
 
 
+CHANNEL_ALIAS = {"sms": "phone", "telegram": "social", "whatsapp": "social",
+                 "landing": "email"}
+
+
 def choose(channel: str | None = None, has: set[str] | None = None,
            limit: int = 3) -> list[Pack]:
     packs, _ = load_all()
+    if channel:
+        matching = [p for p in packs if p.channel == channel]
+        if not matching:
+            channel = CHANNEL_ALIAS.get(channel, channel)
     has = has or set()
     scored = []
     for pack in packs:

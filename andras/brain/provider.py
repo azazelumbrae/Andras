@@ -75,7 +75,8 @@ def resolve(config, phase: str = "default") -> list[Target]:
         if not key and spec.get("needs_key", True):
             continue
         base = (preferred.get("base_url") or spec["base_url"]).rstrip("/")
-        model = preferred.get("model") if preferred.get("provider") == name else spec["model"]
+        model = (preferred.get("model") if preferred.get("provider") == name else None) \
+            or spec["model"]
         out.append(Target(name=name, base_url=base, model=model, api_key=key or "ollama",
                           timeout=float(cfg.get("timeout", 180))))
     return out
@@ -131,13 +132,20 @@ def _call(target: Target, messages, temperature, json_mode, max_tokens) -> str:
 def complete_json(config, messages, *, phase: str = "default", temperature: float = 0.2,
                   max_tokens: int = 4000) -> dict:
     last = ""
-    for attempt, json_mode in enumerate((True, False)):
+    broken = ""
+    for attempt, json_mode in enumerate((True, False, False)):
+        current = messages
+        if attempt == 2 and broken:
+            current = messages + [
+                {"role": "assistant", "content": broken[:4000]},
+                {"role": "user", "content": "Ese JSON era inválido. Devuelve solo el objeto "
+                                            "JSON corregido, sin explicación."}]
         try:
-            raw = complete(config, messages, phase=phase, temperature=temperature,
+            raw = complete(config, current, phase=phase, temperature=temperature,
                            json_mode=json_mode, max_tokens=max_tokens)
         except LLMError as exc:
             last = str(exc)
-            if attempt:
+            if attempt >= 1:
                 raise
             continue
         try:
@@ -147,6 +155,7 @@ def complete_json(config, messages, *, phase: str = "default", temperature: floa
             last = "el JSON no es un objeto"
         except json.JSONDecodeError:
             last = "JSON inválido"
+            broken = raw
     raise LLMError(f"El modelo no devolvió JSON usable ({last})")
 
 

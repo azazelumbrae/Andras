@@ -400,9 +400,8 @@ def build(attack_id: str) -> None:
 def deliver(attack_id: str, to: str = typer.Option(..., "--to"),
             force: bool = typer.Option(False, "--force")) -> None:
     """Enruta el artefacto por su canal y registra la entrega."""
-    from andras.artifacts import render
     from andras.brain import planner
-    from andras.delivery import send as deliver_fn
+    from andras.delivery import pipeline
     from andras.store import db
 
     config = _config()
@@ -410,35 +409,135 @@ def deliver(attack_id: str, to: str = typer.Option(..., "--to"),
         attack = planner.load(conn, attack_id)
         if not attack:
             raise typer.Exit("Vector inexistente")
-        rendered = render.build(attack["channel"], attack)
-        if rendered.problems and not force:
-            for problem in rendered.problems:
-                console.print(f"[yellow]QA: {problem}[/yellow]")
-            raise typer.Exit("QA con problemas; revisa o usa --force")
-
-        campaign = new_campaign(conn, attack["angle"], _hash(to))
-        conn.execute("UPDATE campaigns SET mission_id=?, attack_id=?, channel=? WHERE id=?",
-                     (attack["mission_id"], attack_id, attack["channel"], campaign))
-        url = config["base_url"].rstrip("/") + "/" + campaign
-        text = rendered.text.replace(render.TRACKING, url)
-        html_body = rendered.html.replace(render.TRACKING, url) if rendered.html else None
-
-        if attack["channel"] in {"email", "sms", "telegram", "whatsapp"}:
-            _confirm(f"Enviar por {attack['channel']} a {to}. Escribe SEND")
-        result = deliver_fn(attack["channel"], config, to, rendered.subject, text, html_body)
-        conn.execute("INSERT INTO deliveries(attack_id,campaign_id,channel,target,status,"
-                     "external_id,error,sent_at) VALUES(?,?,?,?,?,?,?,?)",
-                     (attack_id, campaign, attack["channel"], to,
-                      "sent" if result.ok else "failed", result.external_id,
-                      result.error, None if not result.ok else db.now()))
-        if result.ok:
-            record(conn, campaign, "sent")
-    if not result.ok:
-        console.print(f"[red]Fallo: {result.error}[/red]")
+        channel = attack["channel"]
+        if channel in {"email", "sms", "telegram", "whatsapp"}:
+            _confirm(f"Enviar por {channel} a {to}. Escribe SEND")
+        outcome = pipeline.deliver(conn, config, attack_id, to, force=force)
+    if outcome.problems:
+        for problem in outcome.problems:
+            console.print(f"[yellow]QA: {problem}[/yellow]")
+    if not outcome.ok:
+        console.print(f"[red]Fallo: {outcome.error}[/red]")
+        console.print("[dim]Copia el mensaje a mano:[/dim]\n" + outcome.text)
         raise typer.Exit(1)
-    console.print(f"Entregado. Enlace: {url}")
-    if attack["channel"] in {"phone", "social"}:
+    console.print(f"Entregado. Enlace: {outcome.url}")
+    if channel in {"phone", "social"}:
+        from andras.artifacts import render
+
         console.print(render.call_sheet(attack))
+
+
+# ------------------------------------------------------------------ v3: campaña
+
+campaign_app = typer.Typer(help="Campañas omnicanal: planificar y ejecutar la secuencia.")
+app.add_typer(campaign_app, name="campaign")
+
+
+@campaign_app.command("plan")
+def campaign_plan(mission_id: str | None = typer.Option(None, "--mission"),
+                  channels: str = typer.Option("", "--channels"),
+                  length: int = typer.Option(4, "--length")) -> None:
+    """Compone la secuencia omnicanal y genera el guion de cada paso."""
+    from andras.brain import campaign
+    from andras.store import db, plans
+
+    config = _config()
+    mission = _mission(config, mission_id)
+    wanted = [c.strip() for c in channels.split(",") if c.strip()] or None
+    with db.session(config) as conn:
+        plan_id = campaign.compose(conn, config, mission, channels=wanted, length=length,
+                                   log=console.print)
+        plan = plans.get(conn, plan_id)
+    console.print(f"Plan [bold]{plan_id}[/bold] — {plan['title']}")
+    console.print(plan["narrative"])
+    _show_steps(config, plan_id)
+
+
+def _show_steps(config, plan_id: str) -> None:
+    from andras.store import db, plans
+
+    with db.readonly(config) as conn:
+        rows = [[s["position"], s["channel"], s["pack_id"], s["delay_hours"], s["trigger"],
+                 s["status"], s["attack_id"] or ""]
+                for s in plans.steps(conn, plan_id)]
+    _table("Pasos", ["#", "canal", "pack", "espera h", "disparador", "estado", "ataque"], rows)
+
+
+@campaign_app.command("show")
+def campaign_show(plan_id: str) -> None:
+    """Muestra un plan y el guion de cada paso."""
+    from andras.brain import planner
+    from andras.store import db, plans
+
+    config = _config()
+    with db.readonly(config) as conn:
+        plan = plans.get(conn, plan_id)
+        if not plan:
+            raise typer.Exit("Plan inexistente")
+        rows = list(plans.steps(conn, plan_id))
+        attacks = {s["attack_id"]: planner.load(conn, s["attack_id"]) for s in rows
+                   if s["attack_id"]}
+    console.print(f"[bold]{plan['title']}[/bold]\n{plan['narrative']}\n")
+    for step in rows:
+        console.rule(f"{step['position']}. {step['channel']} — {step['pack_id']}")
+        console.print(f"[dim]+{step['delay_hours']}h · {step['trigger']} · {step['why']}[/dim]")
+        attack = attacks.get(step["attack_id"])
+        if not attack:
+            console.print("[yellow]sin guion generado[/yellow]")
+            continue
+        for substep in attack.get("steps", []):
+            console.print(f"[bold]{substep.get('actor')}[/bold] {substep.get('action')}")
+            console.print(substep.get("script", "") + "\n")
+
+
+@campaign_app.command("run")
+def campaign_run(plan_id: str, to: str = typer.Option(..., "--to"),
+                 resume: bool = typer.Option(False, "--resume"),
+                 skip_wait: bool = typer.Option(False, "--skip-wait")) -> None:
+    """Ejecuta la secuencia respetando disparadores y esperas."""
+    from andras.brain import campaign
+    from andras.delivery import pipeline
+    from andras.store import db, plans
+
+    config = _config()
+    with db.session(config) as conn:
+        ready = campaign.run(conn, config, plan_id, target=to, resume=resume,
+                             skip_wait=skip_wait, log=console.print)
+        plans.set_status(conn, plan_id, "running")
+        for item in ready:
+            if item["status"] != "listo":
+                console.print(f"  · paso {item['position']}: {item['status']}"
+                              + (f" ({item.get('trigger')})" if item.get("trigger") else ""))
+                continue
+            step = next(s for s in plans.steps(conn, plan_id)
+                        if s["position"] == item["position"])
+            if item["channel"] in {"email", "sms", "telegram", "whatsapp"}:
+                _confirm(f"Paso {step['position']} por {item['channel']}. Escribe SEND")
+            outcome = pipeline.deliver(conn, config, item["attack_id"], to)
+            plans.mark(conn, step["id"], "done" if outcome.ok else "failed")
+            console.print(f"  → paso {step['position']} {item['channel']}: "
+                          + ("enviado" if outcome.ok else f"fallo ({outcome.error})"))
+            if outcome.problems:
+                for problem in outcome.problems:
+                    console.print(f"    [yellow]QA: {problem}[/yellow]")
+            if not outcome.ok:
+                console.print(f"    [dim]enlace: {outcome.url}[/dim]")
+                console.print("    [dim]texto para enviar a mano:[/dim]\n    "
+                              + outcome.text.replace("\n", "\n    "))
+        plans.set_status(conn, plan_id, "done")
+
+
+@app.command()
+def debrief(mission_id: str | None = typer.Option(None, "--mission")) -> None:
+    """Genera el informe de la misión y lo guarda en data/reports."""
+    from andras.brain import debrief as debrief_mod
+    from andras.store import db
+
+    config = _config()
+    mission = _mission(config, mission_id)
+    with db.session(config) as conn:
+        path = debrief_mod.build(conn, config, mission, log=console.print)
+    console.print(f"Informe: {path}")
 
 
 @app.command()

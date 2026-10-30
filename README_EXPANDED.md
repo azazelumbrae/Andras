@@ -18,7 +18,9 @@ Estado actual:
 - [x] dossier, ganchos, plan, crítico adversarial
 - [x] render por canal, QA y entrega SMTP/Telegram/Twilio/manual
 - [x] landing con formulario y captura
-- [ ] lotes de varios vectores por misión
+- [x] campañas omnicanal con disparadores y reintentos
+- [x] 201 packs importados de unjail.ai, validados
+- [x] informe de misión exportable (`debrief`)
 - [ ] bot conversacional para Telegram (respuesta adaptativa)
-- [ ] informe de misión exportable
 - [ ] proxy inverso tipo Evilginx
+- [ ] captura de OTP

@@ -192,10 +192,11 @@ de lógica en los routers.
 | 1 | store + intake + dossier con procedencia | misión creada, artifacts con fuente y confianza | hecho |
 | 2 | recon real (5 colectores) | dossier poblado desde 1 email/dominio | hecho, sin red probada |
 | 3 | brain + packs + validador | plan de 2 vectores con guiones completos | hecho |
-| 4 | artefactos + landing con tracking | correo real enviado y visita registrada | hecho, falta envío real |
-| 5 | crítico adversarial + debrief | informe de misión exportable | crítico hecho, debrief pendiente |
-| 6 | canales interactivos (Telegram, SMS) | respuesta de la víctima registrada | envío hecho, respuesta pendiente |
+| 4 | artefactos + landing con tracking | correo real enviado y visita registrada | hecho y probado con SMTP local |
+| 5 | crítico adversarial + debrief | informe de misión exportable | hecho |
+| 6 | canales interactivos (Telegram, SMS) | respuesta de la víctima registrada | envío hecho (Twilio sin probar), respuesta pendiente |
 | 7 | captura de credenciales opcional | formulario + OTP | formulario hecho, OTP pendiente |
+| 8 | campaña omnicanal con disparadores | secuencia de 3-6 pasos ejecutada sola | hecho |
 
 Fase 0 y 1 son requisito de todo lo demás.
 
@@ -213,3 +214,27 @@ Fase 0 y 1 son requisito de todo lo demás.
 
 La landing se sirve igual porque es parte del canal, no de la UI: el operador vive en la
 terminal.
+
+## 9. Campaña omnicanal
+
+Una misión no termina en un correo. `campaign` compone una **secuencia** de 3 a 6 pasos
+(`plans` + `plan_steps`) donde cada paso lleva canal, pack, espera y disparador:
+
+| Disparador | Sale cuando |
+|---|---|
+| `always` | siempre (solo el primer paso) |
+| `no_visit` | la víctima no ha abierto el enlace anterior |
+| `visited` | sí lo abrió: se explota el interés |
+| `no_reply` | no contestó al canal anterior |
+| `no_submit` | no dejó credenciales |
+
+Cada paso guarda su propio `attack_id` con guion completo y el mismo gancho. El orden es
+deliberado: email abre, SMS empuja, la llamada cierra, el último email pide el artefacto
+final. `campaign run` evalúa los disparadores contra `events` y se detiene en cada envío si
+no hay `ANDRAS_YES`; `--resume` retoma lo pendiente y reintenta lo fallido.
+
+Si un adaptador no tiene credenciales, el paso se marca `failed` y la terminal imprime el
+texto y el enlace con token: el operador puede enviarlo a mano sin romper la secuencia.
+
+Los packs de unjail.ai se importan con `scripts/import_unjail_packs.py` (201 packs, 7 turnos)
+y `packs --validate` los comprueba todos.

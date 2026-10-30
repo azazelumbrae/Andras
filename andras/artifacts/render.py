@@ -31,13 +31,17 @@ def _attacker_steps(payload: dict) -> list[dict]:
     return [step for step in payload.get("steps", []) if step.get("actor", "ATACANTE") == "ATACANTE"]
 
 
-def _body(payload: dict) -> str:
+def _body(payload: dict, channel: str = "email") -> str:
     steps = _attacker_steps(payload)
-    return steps[-1]["script"] if steps else ""
+    if not steps:
+        return ""
+    if channel == "email":
+        return "\n\n".join(step["script"].strip() for step in steps if step.get("script"))
+    return steps[-1]["script"]
 
 
 def build(channel: str, payload: dict, tracking_url: str = TRACKING) -> Rendered:
-    body = _body(payload)
+    body = _body(payload, channel)
     subject = payload.get("subject") or payload.get("angle", "")
     if channel in {"email", "landing"}:
         html = env.get_template("email.html.j2").render(subject=subject, body=body)
