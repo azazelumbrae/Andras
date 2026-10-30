@@ -15,6 +15,7 @@ Copia `.env.example` a `.env` y rellena lo que uses: los secretos van ahí, no e
 `config.json`.
 
 ```sh
+git clone https://github.com/azazelumbrae/Andras.git && cd Andras
 python3 -m venv .venv
 .venv/bin/pip install -e '.[dev]'
 cp config.example.json config.json     # edita SMTP, base_url y llm
