@@ -53,3 +53,23 @@ def toolbox_snapshot(ctx) -> dict:
     return {"text": f"{len(result['ready'])} herramientas disponibles, "
                     f"{len(result['missing'])} ausentes. Anotado.",
             "data": result}
+
+
+@tools.tool("toolbox_run", permission="write",
+            description="Ejecuta una herramienta de la lista blanca (`httrack` espeja un portal, "
+                        "`urlcrazy` propone dominios parecidos, `eyewitness` captura un portal). "
+                        "Guarda la salida en data/toolbox y la devuelve recortada.",
+            schema={"type": "object",
+                    "properties": {"key": {"type": "string", "enum": list(toolbox.RUNNABLE)},
+                                   "target": {"type": "string"},
+                                   "timeout": {"type": "integer"}},
+                    "required": ["key", "target"]})
+def toolbox_run(ctx, key: str, target: str, timeout: int = 300) -> dict:
+    try:
+        ok, output, folder = toolbox.run_tool(key, target, ctx.mission.id,
+                                               timeout=max(10, min(900, timeout)))
+    except toolbox.ToolboxError as exc:
+        raise tools.ToolError(str(exc)) from exc
+    head = "hecho" if ok else "falló"
+    return {"text": f"{head} · salida en {folder}\n{output[:2500]}",
+            "data": {"ok": ok, "folder": folder}}

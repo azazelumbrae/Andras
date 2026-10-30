@@ -55,14 +55,14 @@ def test_blocker_explains_limits():
 
 
 def test_card_and_table(monkeypatch):
-    monkeypatch.setattr(toolbox.shutil, "which", lambda name: None)
+    monkeypatch.setattr(toolbox, "resolve_bin", lambda tool: "")
     card = toolbox.card(toolbox.get("set"))
     assert "no instalada" in card and "Encaje" in card
     assert "set" in toolbox.table()
 
 
 def test_snapshot_records_on_mission(ctx, monkeypatch):
-    monkeypatch.setattr(toolbox.shutil, "which", lambda name: None)
+    monkeypatch.setattr(toolbox, "resolve_bin", lambda tool: "")
     result = toolbox_tools.toolbox_snapshot(ctx)
     assert result["data"]["ready"] == []
     notes = ctx.conn.execute("SELECT notes FROM missions WHERE id=?",
@@ -71,7 +71,7 @@ def test_snapshot_records_on_mission(ctx, monkeypatch):
 
 
 def test_show_reports_state(ctx, monkeypatch):
-    monkeypatch.setattr(toolbox.shutil, "which", lambda name: "/usr/bin/" + name)
+    monkeypatch.setattr(toolbox, "resolve_bin", lambda tool: "/usr/bin/x")
     result = toolbox_tools.toolbox_show(ctx, "httrack")
     assert result["data"]["installed"] is True
 
@@ -84,6 +84,33 @@ def test_show_unknown(ctx):
 
 
 def test_missing_lists_install_commands(ctx, monkeypatch):
-    monkeypatch.setattr(toolbox.shutil, "which", lambda name: None)
+    monkeypatch.setattr(toolbox, "resolve_bin", lambda tool: "")
     result = toolbox_tools.toolbox_install_hint(ctx, "clonado")
     assert "brew install httrack" in result["text"]
+
+
+def test_urlcrazy_is_vendored(monkeypatch, tmp_path):
+    from andras.core import ROOT
+
+    path = ROOT / "scripts" / "urlcrazy.sh"
+    assert path.is_file()
+    assert toolbox.resolve_bin(toolbox.get("urlcrazy")) == str(path)
+    monkeypatch.setattr(toolbox.shutil, "which", lambda name: "/usr/bin/" + name)
+    assert toolbox.resolve_bin(toolbox.get("urlcrazy")) == str(path)
+
+
+def test_run_rejects_tool_outside_whitelist(monkeypatch):
+    monkeypatch.setattr(toolbox, "installed", lambda tool: True)
+    with pytest.raises(toolbox.ToolboxError):
+        toolbox.run_tool("set", "https://x.y")
+    with pytest.raises(toolbox.ToolboxError):
+        toolbox.run_tool("httrack", "  ")
+
+
+def test_run_executes_and_saves(monkeypatch, tmp_path):
+    monkeypatch.setattr(toolbox, "installed", lambda tool: True)
+    monkeypatch.setattr(toolbox, "resolve_bin", lambda tool: "/bin/echo")
+    monkeypatch.setattr(toolbox, "outdir", lambda mission_id, key: tmp_path)
+    ok, output, _ = toolbox.run_tool("httrack", "https://acme.com")
+    assert ok and "acme.com" in output
+    assert (tmp_path / "salida.txt").read_text().strip()

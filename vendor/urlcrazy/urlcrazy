@@ -1,0 +1,5 @@
+#!/bin/sh
+# URLCrazy ya no está en rubygems: vive en ~/.local/share/urlcrazy con gemas propias.
+DIR="$HOME/.local/share/urlcrazy"
+export GEM_HOME="$DIR/vendor/gems" GEM_PATH="$DIR/vendor/gems"
+exec ruby "$DIR/urlcrazy.rb" "$@"

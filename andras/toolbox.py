@@ -11,6 +11,7 @@ from __future__ import annotations
 import shutil
 import sqlite3
 from dataclasses import dataclass
+from pathlib import Path
 
 CATEGORIES = ("clonado", "proxy", "red", "marca", "captura", "payload")
 
@@ -26,6 +27,7 @@ class Tool:
     use: str
     fit: str
     needs: str = ""
+    local: str = ""
 
 
 TOOLS: tuple[Tool, ...] = (
@@ -154,10 +156,10 @@ TOOLS: tuple[Tool, ...] = (
          "python"),
     Tool("urlcrazy", "URLCrazy", "marca",
          "Genera y comprueba variantes tipográficas del dominio (typosquatting).",
-         "urlcrazy", "gem install urlcrazy",
-         "urlcrazy acme.com",
+         "scripts/urlcrazy.sh", "incluida en vendor/ (necesita ruby); no está en rubygems",
+         "scripts/urlcrazy.sh acme.com",
          "Elegir dominio parecido cuando no se puede usar el real.",
-         "ruby"),
+         "ruby", local="scripts/urlcrazy.sh"),
     Tool("wireshark", "Wireshark", "captura",
          "Analizador de tráfico gráfico con disección de protocolos.",
          "wireshark", "brew install --cask wireshark",
@@ -198,11 +200,30 @@ def get(key: str) -> Tool:
         raise ToolboxError(f"herramienta desconocida: {key}") from None
 
 
-def installed(tool: Tool) -> bool:
-    """Comprueba el binario, y el prefijo `atk6-` de THC por ser un familia."""
+def local_bin(name: str) -> str:
+    """Ruta en `~/.local/bin`, que no suele estar en el PATH de la app."""
+    candidate = Path.home() / ".local" / "bin" / name
+    return str(candidate) if candidate.is_file() else ""
+
+
+def resolve_bin(tool: Tool) -> str:
+    """Binario usable: primero el vendorizado en el repo, luego el de fuera."""
+    if tool.local:
+        from andras.core import ROOT
+
+        path = ROOT / tool.local
+        return str(path) if path.is_file() else ""
     if tool.binary.endswith("-"):
-        return any(shutil.which(tool.binary + s) for s in ("fake_router6", "flood_router6"))
-    return shutil.which(tool.binary) is not None
+        for suffix in ("fake_router6", "flood_router6"):
+            found = shutil.which(tool.binary + suffix) or local_bin(tool.binary + suffix)
+            if found:
+                return found
+        return ""
+    return shutil.which(tool.binary) or local_bin(tool.binary)
+
+
+def installed(tool: Tool) -> bool:
+    return bool(resolve_bin(tool))
 
 
 def blocker(tool: Tool) -> str:
@@ -260,3 +281,52 @@ def record_check(conn: sqlite3.Connection, mission_id: str) -> dict:
     conn.execute("UPDATE missions SET notes = COALESCE(notes,'') || ? WHERE id = ?",
                  (f"\n[arsenal {now()}] disponibles: {payload or 'ninguna'}", mission_id))
     return {"ready": ready, "missing": sorted(t.key for t in TOOLS if t.key not in ready)}
+
+
+RUNNABLE = ("httrack", "urlcrazy", "eyewitness")
+
+
+def outdir(mission_id: str, key: str) -> Path:
+    from andras.core import ROOT
+
+    path = ROOT / "data" / "toolbox" / mission_id / key
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _argv(key: str, target: str, dest: Path) -> list[str]:
+    if key == "httrack":
+        return ["httrack", target, "-O", str(dest), "-q", "-%v"]
+    if key == "urlcrazy":
+        return ["urlcrazy", target]
+    return ["eyewitness", "--web", target, "-d", str(dest)]
+
+
+def run_tool(key: str, target: str, mission_id: str = "", *,
+             timeout: int = 300) -> tuple[bool, str, str]:
+    """Ejecuta una herramienta de la lista blanca. Devuelve (ok, salida, carpeta)."""
+    tool = get(key)
+    binary = resolve_bin(tool)
+    if key not in RUNNABLE:
+        raise ToolboxError(f"{key} no se puede lanzar todavía ({', '.join(RUNNABLE)} sí)")
+    if not target.strip():
+        raise ToolboxError("falta el objetivo")
+    if not installed(tool):
+        raise ToolboxError(f"{tool.name} no está instalada: {tool.install}")
+    dest = outdir(mission_id or "sin-mision", key)
+    argv = _argv(key, target.strip(), dest)
+    argv[0] = binary
+    return _exec(argv, dest, timeout)
+
+
+def _exec(argv: list[str], dest: Path, timeout: int) -> tuple[bool, str, str]:
+    import subprocess
+
+    try:
+        proc = subprocess.run(argv, check=False, timeout=timeout, capture_output=True, text=True)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, f"no se pudo lanzar: {exc}", str(dest)
+    output = (proc.stdout or "") + (proc.stderr or "")
+    ok = proc.returncode == 0
+    (dest / "salida.txt").write_text(output[-20000:], errors="replace")
+    return ok, output.strip()[-4000:] or "sin salida", str(dest)

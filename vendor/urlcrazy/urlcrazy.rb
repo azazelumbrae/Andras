@@ -1,0 +1,339 @@
+#!/usr/bin/env ruby
+#
+# URLCrazy
+# Copyright Andrew Horton
+#
+# rm country-ips.dat
+# wget 'http://software77.net/geo-ip/?DL=1' -O IpToCountry.csv.gz
+# gzip -d IpToCountry.csv.gz
+# wget 'http://software77.net/geo-ip/?DL=6' -O country-codes.txt
+# 
+# License: Copyright Andrew Horton, 2012-2025. You have permission to use and distribute this software. You do not have permission to distribute modified versions without permission. You do not have permission to use this as part of a commercial service unless it forms part of a penetration testing service. For example a commercial service that provides domain protection for clients must obtain a license first. Email me if you require a license.
+$DEBUG = false
+
+begin
+  require 'rubygems'
+  require 'getoptlong'
+  require 'singleton'
+  require 'pp'
+  require 'socket'
+  require 'net/http'
+  require 'resolv'
+  require 'csv'
+  require 'json'
+  require 'colorize'
+  require 'async'
+  require 'async/dns'
+  require 'async/http'
+  require 'async/http/internet'
+  require 'logger'
+  require 'pry' if $DEBUG
+rescue LoadError
+  #banner
+  puts "URLCrazy dependencies are not installed."
+  puts "To install the dependencies, copy and paste the following command, or check the Installation section of the README.md file."
+  puts "`$ bundle install`\n\n"
+  exit 1
+end
+
+
+$logger = Logger.new(STDOUT)
+
+if $DEBUG
+  $logger.level = Logger::DEBUG
+else
+  $logger.level = Logger::FATAL
+end
+
+# Check the ulimit
+current_ulimit = `sh -c "ulimit -n"`
+if current_ulimit != "unlimited" and current_ulimit.to_i < 10000
+  puts "Warning. File descriptor limit may be too low. Check with `ulimit -a` and change with `ulimit -n 10000`"
+end
+
+# add the directory of the file currently being executed to the load path
+$LOAD_PATH.unshift(File.expand_path(File.dirname(__FILE__))) unless
+$:.include?(File.dirname(__FILE__)) || $LOAD_PATH.include?(File.expand_path(File.dirname(__FILE__)))
+
+# if __FILE__ is a symlink then follow *every* symlink
+if File.symlink?(__FILE__)
+  require 'pathname'
+  $LOAD_PATH << File.dirname( Pathname.new(__FILE__).realpath )
+end
+
+# Add lib to load path
+$LOAD_PATH.unshift(File.join(File.dirname(__FILE__), 'lib'))
+
+require 'inflector.rb'
+require 'tld.rb'
+require 'common-misspellings.rb'
+require 'homophones.rb'
+require 'country.rb'
+require 'output.rb'
+require 'keyboard'
+require 'typo'
+require 'domainname'
+
+
+$VERSION = "0.8.2"
+# DNS_SERVERS = %w| 8.8.8.8 8.8.4.4 64.6.64.6 64.6.65.6 209.244.0.3 209.244.0.4 |
+
+ASYNC_DNS_SERVERS = [ [:udp, "8.8.8.8", 53],
+                      [:udp, "8.8.4.4", 53],
+                      [:udp, "64.6.64.6", 53],
+                      [:udp, "64.6.65.6", 53],
+                      [:udp, "209.244.0.3", 53],
+                      [:udp, "209.244.0.4", 53],
+                    ]
+
+PREFER_ASCIIART = nil #1
+PREFER_ASCII_COLOUR = nil# :red
+
+def banner
+# thanks http://www.patorjk.com/software/taag/#p=testall&h=2&v=1&f=Graffiti&t=URLCrazy
+
+asciiart = []
+asciiart << '
+____ _____________.____   _________                             
+|    |   \______   \    |  \_   ___ \___________  ___________.__.
+|    |   /|       _/    |  /    \  \|_  __ \__  \ \___   <   |  |
+|    |  / |    |   \    |__\     \___|  | \// __ \_/    / \___  |
+|______/  |____|_  /_______ \______  /__|  (____  /_____ \/ ____|
+                 \/        \/      \/           \/      \/\/     
+
+'
+
+asciiart << '
+ █    ██  ██▀███   ██▓    ▄████▄  ██▀███  ▄▄▄     ▒███████▒▓██   ██▓
+ ██  ▓██▒▓██ ▒ ██▒▓██▒   ▒██▀ ▀█ ▓██ ▒ ██▒████▄   ▒ ▒ ▒ ▄▀░ ▒██  ██▒
+▓██  ▒██░▓██ ░▄█ ▒▒██░   ▒▓█    ▄▓██ ░▄█ ▒██  ▀█▄ ░ ▒ ▄▀▒░   ▒██ ██░
+▓▓█  ░██░▒██▀▀█▄  ▒██░   ▒▓▓▄ ▄██▒██▀▀█▄ ░██▄▄▄▄██  ▄▀▒   ░  ░ ▐██▓░
+▒▒█████▓ ░██▓ ▒██▒░██████▒ ▓███▀ ░██▓ ▒██▒▓█   ▓██▒███████▒  ░ ██▒▓░
+░▒▓▒ ▒ ▒ ░ ▒▓ ░▒▓░░ ▒░▓  ░ ░▒ ▒  ░ ▒▓ ░▒▓░▒▒   ▓▒█░▒▒ ▓░▒░▒   ██▒▒▒
+░░▒░ ░ ░   ░▒ ░ ▒░░ ░ ▒  ░ ░  ▒    ░▒ ░ ▒░ ▒   ▒▒ ░░▒ ▒ ░ ▒ ▓██ ░▒░
+ ░░░ ░ ░   ░░   ░   ░ ░  ░         ░░   ░  ░   ▒  ░ ░ ░ ░ ░ ▒ ▒ ░░
+   ░        ░         ░  ░ ░        ░          ░  ░ ░ ░     ░ ░
+                         ░                        ░         ░ ░
+
+'
+
+asciiart << "
+db    db d8888b. db       .o88b. d8888b.  .d8b.  d88888D db    db 
+88    88 88  `8D 88      d8P  Y8 88  `8D d8' `8b YP  d8' `8b  d8' 
+88    88 88oobY' 88      8P      88oobY' 88ooo88    d8'   `8bd8'  
+88    88 88`8b   88      8b      88`8b   88~~~88   d8'      88    
+88b  d88 88 `88. 88booo. Y8b  d8 88 `88. 88   88  d8' db    88    
+~Y8888P' 88   YD Y88888P  `Y88P' 88   YD YP   YP d88888P    YP    
+
+"
+
+asciiart << '
+_______ ______ _____   ______                         
+|   |   |   __ \     |_|      |.----.---.-.-----.--.--.
+|   |   |      <       |   ---||   _|  _  |-- __|  |  |
+|_______|___|__|_______|______||__| |___._|_____|___  |
+                                                |_____|
+
+'       
+asciiart[ (PREFER_ASCIIART or rand(asciiart.size)) ]
+end
+
+def usage 
+    random_colour = (PREFER_ASCII_COLOUR or [:red, :green, :blue, :yellow, :cyan ][ rand(5) ])
+    print_output banner.colorize( random_colour )
+
+print "URLCrazy version #{$VERSION} by Andrew Horton (urbanadventurer)
+Visit https://github.com/urbanadventurer/urlcrazy
+
+Generate and test domain typos and variations to detect and perform typo squatting, URL hijacking,
+phishing, and corporate espionage.
+
+Supports the following domain variations:
+Character omission, character repeat, adjacent character swap, adjacent character replacement, double 
+character replacement, adjacent character insertion, missing dot, strip dashes, insert dash,
+singular or pluralise, common misspellings, vowel swaps, homophones, bit flipping (cosmic rays),
+homoglyphs, wrong top level domain, and wrong second level domain.
+
+Usage: #{$0} [options] domain
+
+Options
+-k, --keyboard=LAYOUT  Options are: qwerty, azerty, qwertz, dvorak (default: qwerty)
+-p, --popularity       Check domain popularity with Google
+-r, --no-resolve       Do not resolve DNS
+-i, --show-invalid     Show invalid domain names
+-f, --format=TYPE      Human readable, JSON, or CSV (default: human readable)
+-o, --output=FILE      Output file
+-n, --nocolor          Disable colour
+-d, --debug            Enable debugging output for development
+-h, --help             This help
+-v, --version          Print version information. This version is #{$VERSION}
+
+"
+  if RUBY_VERSION.to_f < 1.9
+      puts "Warning: You are using a Ruby version below 1.9. Some features are not available.\n\n"
+  end
+end
+
+# send output to the screen, file, or both
+def puts_output(*s)
+    unless s.empty?
+        $output_filep.puts s.first if $output_filep
+        puts s.first
+    else
+        # as puts with no arguments
+        $output_filep.puts if $output_filep
+        puts
+    end
+end
+
+def print_output(s)
+    $output_filep.print s if $output_filep
+    print s
+end
+
+check_popularity = false
+resolve_domains = true
+show_invalid = false
+show_only_resolve = false
+output_filename = nil
+$output_filep = nil
+keyboard_layout = "qwerty"
+output_type = "human"
+
+opts = GetoptLong.new(
+  [ '--help', '-h', GetoptLong::NO_ARGUMENT ],
+  [ '--keyboard','-k', GetoptLong::REQUIRED_ARGUMENT ],
+  [ '--no-resolve','-r', GetoptLong::NO_ARGUMENT ],
+  [ '--popularity','-p', GetoptLong::NO_ARGUMENT ],
+  [ '--show-invalid','-i', GetoptLong::NO_ARGUMENT ],
+  [ '--output','-o', GetoptLong::REQUIRED_ARGUMENT ],
+  [ '--format','-f', GetoptLong::REQUIRED_ARGUMENT ],
+  [ '--only-resolve','-R', GetoptLong::NO_ARGUMENT ],
+  [ '--debug','-d', GetoptLong::NO_ARGUMENT ],
+  [ '--nocolor','-n', GetoptLong::NO_ARGUMENT ],
+  [ '-v','--version', GetoptLong::NO_ARGUMENT ]
+  )
+
+begin
+   opts.each do |opt, arg|
+    case opt
+    when '--help','-h'
+        usage
+        exit
+    when '--keyboard','-k'
+        if ['qwerty','qwertz','dvorak','azerty'].include? arg.downcase
+            keyboard_layout = arg.downcase
+        else
+            puts "Error: Unknown keyboard layout: #{arg}"
+            exit
+        end
+    when '--no-resolve','-r'
+        resolve_domains = false
+    when '--show-invalid','-i'
+        show_invalid = true
+    when '--only-resolve','-R'
+        show_only_resolve = true  
+    when '--popularity','-p'
+        check_popularity = true 
+    when '--format','-f'
+        output_type=arg.downcase
+        unless ["human","csv","json"].include?(output_type)
+            puts "Invalid output type"
+            exit 1
+        end
+    when '--output','-o'
+        output_filename = arg
+        String.disable_colorization = true
+        begin
+            $output_filep = File.new(output_filename,"w")           
+        rescue
+            puts "Cannot write to output file, #{output_filename}"
+            exit 1
+        end
+    when '--nocolor','-n'
+        String.disable_colorization = true
+    when '--debug','-d'
+        $DEBUG = true
+        $logger.level = Logger::DEBUG
+    when '-v','--version'
+        puts $VERSION; exit
+    end
+end
+rescue
+    puts
+    usage
+    exit
+end
+
+if ARGV.length < 1
+    usage
+    exit
+end
+
+$keyboard = Keyboard.new(keyboard_layout)
+this_domain = Domainname.new(ARGV[0].downcase)
+abort "Aborting. Invalid domainname." unless this_domain.valid == true
+abort "Aborting. Cannot show only domains that resolve when not resolving domains." if show_only_resolve and not resolve_domains
+
+case output_type
+when "human"
+    output = OutputHuman.new( this_domain, keyboard_layout, check_popularity, resolve_domains, show_invalid )
+when "csv"
+    output = OutputCSV.new( this_domain, keyboard_layout, check_popularity, resolve_domains, show_invalid )
+when "json"
+    output = OutputJSON.new( this_domain, keyboard_layout, check_popularity, resolve_domains, show_invalid )
+else
+    abort "Unknown output type"
+end
+
+output.header
+# initiate the country IP address DB
+Countrylookup.startup
+this_domain.create_typos
+# make report
+# remove invalid hostnames
+if show_invalid == false
+    this_domain.typos = this_domain.typos.select { |x| x if x.valid_name }
+end
+puts_output output.hostnames_to_process
+# resolve popularity faster with threads
+$semaphore_countrylookup = Mutex.new
+
+n = 1
+Async do |task|
+
+  this_domain.typos.each do |typo|
+#        task.annotate "Starting on #{typo}"
+#        puts "starting on #{typo}"
+
+    typo.get_resolved if resolve_domains
+    typo.get_popularity_bing if check_popularity
+  end
+=begin
+  #stask.print_hierarchy($stderr)
+  puts "iteration: #{n}"
+  n+=1
+
+  #task.print_hierarchy($stderr)
+
+  if task.children
+    puts "Tasks: #{task.children.size}"
+    num_alive = task.children.select {|node| node.alive? }.size
+    num_stopped = task.children.select {|node| node.stopped? }.size
+
+    num_running = task.children.select {|node| node.running? }.size
+    num_finished = task.children.select {|node| node.finished? }.size
+    num_failed = task.children.select {|node| node.failed? }.size
+
+    puts "alive: #{num_alive}, stopped: #{num_stopped}, running: #{num_running}, finished: #{num_finished}, failed: #{num_failed}"
+  end
+
+  # Print out all running tasks in a tree:
+  #  
+=end
+end
+
+output.table 
+$output_filep.close if $output_filep
+
+

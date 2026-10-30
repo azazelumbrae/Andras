@@ -17,3 +17,6 @@ data/
 
 # snapshots de fuentes y artefactos generados (contienen datos del objetivo)
 data/**/*.raw
+
+# gemas de URLCrazy (se instalan solas con scripts/urlcrazy.sh)
+vendor/urlcrazy/vendor/

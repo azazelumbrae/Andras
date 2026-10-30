@@ -367,3 +367,7 @@ de algo ausente. `andras toolbox list|show|check|snapshot` es la puerta del oper
 
 Sólo `set` clona landings y sólo Evilginx (fuera del catálogo de Parrot) hace proxy con
 sesiones; el resto son apoyo de red, marca o captura, no alternativas al clonador propio.
+
+URLCrazy va **vendorizado** en `vendor/urlcrazy` con el lanzador `scripts/urlcrazy.sh`: ya no
+está en rubygems y así la herramienta se instala sola en su carpeta la primera vez, sin tocar
+nada del sistema. Sólo `httrack` sigue viniendo de brew.
