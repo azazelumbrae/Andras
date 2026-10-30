@@ -1,0 +1,10 @@
+{
+  "id": "extortion-bec",
+  "name": "Extorsión por BEC",
+  "subject": "Acceso a tus finanzas familiares",
+  "body": "Estimados,\n\nNosotros estamos investigando actividades sospechosas en tu cuenta bancaria. Para resolverlo, necesitamos un pago de $5000. Sin embargo, no confíes en este mensaje.\n\nLos datos de tu familia están comprometidos. Actúa ahora para evitar problemas.",
+  "landing_title": "Extorsión familiar",
+  "landing_message": "Este es un ejemplo de coacción. La amenaza implica revelar información privada de tu familia.",
+  "signals": ["amenaza de extorsión", "pago solicitado", "confidencialidad"],
+  "authorized_recipients": []
+}

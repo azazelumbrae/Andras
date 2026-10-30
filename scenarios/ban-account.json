@@ -1,0 +1,10 @@
+{
+  "id": "ban-account",
+  "name": "Ban de Cuenta Automatizada",
+  "subject": "Tu cuenta ha sido bloqueada",
+  "body": "Su cuenta ha sido identificada como parte de una operación de ingeniería social. Se ha detectado actividad sospechosa. Para continuar, debe confirmar tu identidad mediante este proceso.",
+  "landing_title": "Bloqueo de cuenta",
+  "landing_message": "Automatización de bannings. Observa cómo los sistemas detectan patrones de comportamiento y aplican restricciones.",
+  "signals": ["bloqueo automático", "detección de patrones", "restricciones"],
+  "authorized_recipients": []
+}

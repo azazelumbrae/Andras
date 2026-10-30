@@ -1,0 +1,9 @@
+{
+  "id": "suspicious-email",
+  "name": "Aviso ficticio de revisión de cuenta",
+  "subject": "Ejercicio ANDRAS: revisa esta notificación",
+  "body": "Hola,\n\nEste es un ejercicio interno de concienciación. Revisa la notificación de práctica aquí: {training_url}\n\nANDRAS Lab",
+  "landing_title": "Ejercicio de seguridad",
+  "landing_message": "Esta notificación era una simulación. En un mensaje inesperado, comprueba el remitente y el destino del enlace usando un canal conocido.",
+  "signals": ["remitente inesperado", "urgencia o petición inusual", "destino del enlace"]
+}

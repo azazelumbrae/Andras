@@ -1,0 +1,22 @@
+{
+  "smtp_host": "smtp.example.com",
+  "smtp_port": 587,
+  "smtp_security": "starttls",
+  "smtp_user_env": "ANDRAS_SMTP_USER",
+  "smtp_password_env": "ANDRAS_SMTP_PASSWORD",
+  "from_address": "tu-direccion-de-envio@example.com",
+  "from_name": "ANDRAS Lab",
+  "authorized_recipients": [
+    "andras-lab@mailinator.com"
+  ],
+  "bind_host": "127.0.0.1",
+  "port": 8765,
+  "base_url": "http://127.0.0.1:8765",
+  "database": "data/andras.sqlite3",
+  "osint_toolkit": "/Users/alvarosouza/OSINT",
+  "deepseek_api_key_env": "ANDRAS_DEEPSEEK_API_KEY",
+  "deepseek_base_url": "https://api.deepseek.com",
+  "deepseek_model": "deepseek-chat",
+  "max_pages_per_mission": 14,
+  "require_confirmation": true
+}

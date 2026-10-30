@@ -1,0 +1,10 @@
+{
+  "id": "social-bot-fake",
+  "name": "Creación de Falsos Cuentas",
+  "subject": "Nuevo perfil: Falsificación de identidad",
+  "body": "Hola,\n\nHe creado un nuevo perfil en redes sociales para engañar a alguien. Este perfil no existe realmente.\n\nVerifica si este perfil es genuino.",
+  "landing_title": "Falsificación de identidad",
+  "landing_message": "Usa herramientas de bots para crear perfiles falsos y manipular opiniones. Observa cómo funciona el engagement artificial.",
+  "signals": ["creación de perfil", "engagement artificial", "manipulación"],
+  "authorized_recipients": []
+}

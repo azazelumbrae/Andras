@@ -1,0 +1,10 @@
+{
+  "id": "osint-discover",
+  "name": "OSINT Discovery",
+  "subject": "Ejercicio: Recopila información sobre una víctima",
+  "body": "Hola,\n\nEstamos investigando una posible brecha de seguridad. Por favor, proporciona cualquier información que tengas sobre esta persona:\n\n- Datos de contacto\n- Empresas afiliadas\n- Historial de actividad en redes sociales\n- Documentos públicos\n\nNota: Esta es una simulación educativa. No compartas datos reales.",
+  "landing_title": "Investigación de seguridad",
+  "landing_message": "Utiliza herramientas de OSINT para recopilar información antes de intentar engañarla. Observa patrones de comportamiento y conexiones.",
+  "signals": ["OSINT collection", "patrones de conexión", "historial digital"],
+  "authorized_recipients": []
+}

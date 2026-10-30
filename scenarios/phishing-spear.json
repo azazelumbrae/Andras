@@ -1,0 +1,10 @@
+{
+  "id": "phishing-spear",
+  "name": "Spear Phishing",
+  "subject": "Importante: Confirmación de cuenta",
+  "body": "Hola,\n\nRecibimos tu solicitud de verificar tu cuenta. Para mayor seguridad, necesitamos confirmar tu información.\n\nPor favor, responde a este mensaje desde tu correo oficial.\n\n[Link maliciosa]\n\nAdiós,\nAnonymous",
+  "landing_title": "Correo de phishing",
+  "landing_message": "Este es un ejemplo de phishing. Nota que el dominio tiene un error ortográfico y el enlace lleva un homófoneto.",
+  "signals": ["correo falso", "dominio malicioso", "homografías"],
+  "authorized_recipients": []
+}
