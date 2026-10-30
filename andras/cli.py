@@ -932,6 +932,50 @@ def channels_dkim(domain: str, selector: str = typer.Option("andras", "--selecto
         console.print(channel_tools.generate_dkim_zone(ctx, domain, selector)["text"])
 
 
+toolbox_app = typer.Typer(help="Arsenal de ingeniería social: fichas, estado e instalación.")
+app.add_typer(toolbox_app, name="toolbox")
+
+
+@toolbox_app.command("list")
+def toolbox_list(category: str = typer.Option("", "--category")) -> None:
+    """Lista el arsenal y qué está instalado."""
+    from andras import toolbox
+
+    console.print(toolbox.table(category))
+
+
+@toolbox_app.command("show")
+def toolbox_show(key: str) -> None:
+    """Ficha de una herramienta."""
+    from andras import toolbox
+
+    try:
+        console.print(toolbox.card(toolbox.get(key)))
+    except toolbox.ToolboxError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+
+@toolbox_app.command("check")
+def toolbox_check() -> None:
+    """Qué falta por instalar y cómo."""
+    from andras import toolbox
+
+    console.print(toolbox.summary())
+
+
+@toolbox_app.command("snapshot")
+def toolbox_snapshot(mission_id: str | None = typer.Option(None, "--mission")) -> None:
+    """Anota el arsenal disponible en la misión."""
+    from andras import toolbox
+    from andras.store import db
+
+    config = _config()
+    mission = _mission(config, mission_id)
+    with db.session(config) as conn:
+        result = toolbox.record_check(conn, mission.id)
+    console.print(f"{len(result['ready'])} disponibles, {len(result['missing'])} ausentes.")
+
+
 def main() -> None:
     app()
 

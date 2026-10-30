@@ -354,3 +354,16 @@ la entrega de ese chat y contesta con el modelo en el papel del guion, en una a 
 Cada intercambio queda en `bot_messages`, se marca `replied` en la campaña y se anota en el
 diario. El operador puede parar el bot y escribir a mano cuando el momento lo pida: el guion
 está en la nota y en el diario.
+
+## 19. Arsenal de ingeniería social
+
+`andras/toolbox.py` es un catálogo de 24 herramientas de Parrot, organizadas por función:
+clonado, proxy, red, marca, captura y payload. Cada ficha dice qué hace, cómo se instala, cómo
+se usa, qué punto de la campaña atiende y qué le impide correr aquí (Linux, root, red local).
+
+El catálogo no ejecuta nada salvo `which`: se consulta. `toolbox_snapshot` deja anotado en la
+misión qué había disponible al planificar, para que el agente no prometa un paso que depende
+de algo ausente. `andras toolbox list|show|check|snapshot` es la puerta del operador.
+
+Sólo `set` clona landings y sólo Evilginx (fuera del catálogo de Parrot) hace proxy con
+sesiones; el resto son apoyo de red, marca o captura, no alternativas al clonador propio.

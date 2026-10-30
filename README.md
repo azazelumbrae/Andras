@@ -120,6 +120,7 @@ adapta sola al silencio de la víctima.
 | `wallet new/list` | burner, mixer y treasury |
 | `net show/set/burn` | perfiles de red y quema de infraestructura |
 | `channels audit/dkim` | SPF/DKIM/DMARC del dominio de envío |
+| `toolbox list/show/check` | arsenal de ingeniería social e instalación |
 | `preview/send/serve/report` | entrenamiento v1 |
 
 ## Operación
