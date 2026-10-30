@@ -5,6 +5,7 @@ Recon, canales y wallets van en módulos aparte y se registran igual, importando
 from __future__ import annotations
 
 import socket
+import subprocess
 from datetime import UTC, datetime
 
 from andras.agent import tools
@@ -64,7 +65,15 @@ def dns_lookup(ctx, domain: str, kind: str = "A") -> dict:
         values = [info[4][0] for info in socket.getaddrinfo(domain, None, family)]
         text = f"{domain} {kind}: " + (", ".join(sorted(set(values))) or "sin registros")
         return {"text": text, "data": sorted(set(values))}
-    return {"text": f"{domain} {kind}: consulta vía colector DNS (P1)", "data": []}
+    try:
+        proc = subprocess.run(["dig", "+short", kind, domain], check=False, timeout=15,
+                              capture_output=True, text=True)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return {"text": f"{domain} {kind}: fallo de dig ({exc})", "data": []}
+    values = [line.strip().strip('"') for line in proc.stdout.splitlines() if line.strip()]
+    if not values:
+        return {"text": f"{domain} {kind}: sin registros", "data": []}
+    return {"text": f"{domain} {kind}: " + " · ".join(values[:12]), "data": values[:12]}
 
 
 @tools.tool("budget_status", permission="read",

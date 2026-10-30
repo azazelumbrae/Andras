@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import sqlite3
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from andras.agent import tools
@@ -20,7 +21,7 @@ def _record(ctx, kind: str, value: str, source: str, confidence: int) -> int | N
     try:
         artifact_id, _ = evidence.add(ctx.conn, ctx.mission.id, Finding(
             kind=kind, value=value, source=source, confidence=confidence))
-    except ValueError:
+    except (ValueError, sqlite3.IntegrityError):
         return None
     return artifact_id
 
@@ -338,3 +339,45 @@ def artifact_link(ctx, artifact_id: int, claim: str) -> dict:
     notes.add(ctx.conn, ctx.mission.id, f"{claim}\n\nsoporte: [{artifact.id}] {artifact.kind} "
               f"{artifact.value} · {artifact.verification}", kind="hallazgo", title=claim[:80])
     return {"text": f"enlazado {artifact.kind} {artifact.value}", "data": {"id": artifact.id}}
+
+
+@tools.tool("email_verify", permission="read",
+            description="Comprueba por SMTP si un buzón existe, sin enviar correo: pregunta a "
+                        "los MX del dominio con RCPT. Devuelve `existe`, `no existe` o "
+                        "`indeterminado` (catch-all). Úsalo antes de dar un correo por bueno.",
+            schema={"type": "object", "properties": {"email": {"type": "string"}},
+                    "required": ["email"]})
+def email_verify(ctx, email: str) -> dict:
+    import smtplib
+    import subprocess
+
+    address = email.strip()
+    if "@" not in address:
+        raise tools.ToolError("correo sin arroba")
+    domain = address.split("@", 1)[1].lower()
+    try:
+        out = subprocess.run(["dig", "+short", "MX", domain], check=False, timeout=10,
+                             capture_output=True, text=True).stdout
+    except (OSError, subprocess.SubprocessError) as exc:
+        return {"text": f"indeterminado: sin DNS ({exc})", "data": {"result": "indeterminado"}}
+    hosts = [line.split()[-1].rstrip(".") for line in out.splitlines() if line.strip()]
+    if not hosts:
+        return {"text": "no existe: el dominio no tiene MX", "data": {"result": "no existe"}}
+    verdict = "indeterminado"
+    for host in hosts[:2]:
+        try:
+            with smtplib.SMTP(host, 25, timeout=8) as smtp:
+                smtp.helo("andras.local")
+                smtp.mail(ctx.config.get("from_address") or "postmaster@andras.local")
+                code, _ = smtp.rcpt(address)
+        except (smtplib.SMTPException, OSError):
+            continue
+        if code in (250, 251):
+            verdict = "existe"
+            break
+        if code in (550, 551, 553):
+            verdict = "no existe"
+            break
+    _record(ctx, "objetivo", address, f"smtp:{verdict}", 55 if verdict == "existe" else 35)
+    return {"text": f"{verdict}: {address} (MX {', '.join(hosts[:2])})",
+            "data": {"result": verdict, "mx": hosts[:2]}}
