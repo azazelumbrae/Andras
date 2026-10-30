@@ -569,12 +569,18 @@ def campaign_run(plan_id: str, to: str = typer.Option(..., "--to"),
 
 
 def _ask_operator(question: str, options: tuple = ()) -> str:
-    """Pregunta al humano sólo si hay terminal; si no, devuelve vacío."""
+    """Pregunta al humano si hay terminal; sin ella elige la primera opción.
+
+    Devolver vacío dejaba al agente sin respuesta y colgaba el plan, así que en
+    headless se toma la opción conservadora que propuso él mismo y se anota.
+    """
     import sys
 
     if not sys.stdin.isatty():
-        console.print(f"[dim]pregunta sin terminal:[/dim] {question} {options}")
-        return ""
+        answer = options[0] if options else ""
+        console.print(f"[dim]pregunta sin terminal:[/dim] {question} {options}"
+                      + (f" [dim]→ {answer}[/dim]" if answer else ""))
+        return answer
     try:
         return typer.prompt(f"{question} {options}")
     except (typer.Abort, EOFError):

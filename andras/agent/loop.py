@@ -6,6 +6,7 @@ por qué paró. Todo lo que hace queda auditado en `tool_runs` y en `data/runs/<
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass, field
 
 from andras.agent import gates, tools
@@ -79,16 +80,22 @@ def run(ctx, policy: gates.Policy, *, system: str, context: str,
                 reply = provider.complete_tools(ctx.config, _sane(messages), catalog,
                                                 phase="agent")
             except provider.LLMError as exc:
-                if "HTTP 500" in str(exc):
-                    _trim(messages, MAX_CONTEXT // 2)
+                reply = None
+                error = exc
+                for _attempt in range(3):
+                    if "HTTP 500" in str(error):
+                        _trim(messages, MAX_CONTEXT // 2)
+                    else:
+                        break
+                    time.sleep(2 + 3 * _attempt)
                     try:
                         reply = provider.complete_tools(ctx.config, _sane(messages), catalog,
                                                         phase="agent")
-                    except provider.LLMError as again:
-                        result.reason, result.message = "llm_error", str(again)
                         break
-                else:
-                    result.reason, result.message = "llm_error", str(exc)
+                    except provider.LLMError as again:
+                        error = again
+                if reply is None:
+                    result.reason, result.message = "llm_error", str(error)
                     break
             tokens = int((reply.get("usage") or {}).get("total_tokens", 0))
             spent = _cost(ctx.config, tokens)

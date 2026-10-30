@@ -321,3 +321,19 @@ ventana se tiene antes de que reviertan la portabilidad.
 | P4 | wallets BTC/XMR, movimientos, mezcla, treasury | hecho |
 | P5 | perfiles de red, Tor, DoH, jitter, quema | hecho |
 | P6 | docs, export del diario, pruebas con modelo real | en curso |
+
+## 16. Cierre determinista y suplantación
+
+El agente puede morir a mitad (proveedor caído, tope de pasos, presupuesto). En vez de
+perder el trabajo, `runner.finalize` completa el plan con lo conservador: rellena hasta tres
+pasos con los canales permitidos, esperas de 24 h y disparador `no_reply`, pone criterio de
+éxito por defecto y narrativa neutra, y lo deja `proposed` para revisión humana. El aviso
+«plan cerrado por el sistema» viaja en el mensaje final.
+
+La suplantación se decide con `spoof_advice`, que mira el DMARC del dominio y enumera lo que
+realmente se puede hacer: nombre visible, `Reply-To` propio o subdominio parecido. Con
+`p=reject` no se puede poner el dominio ajeno en el `From` sin alinear SPF/DKIM.
+
+En headless (`--auto` sin terminal), una pregunta del agente se responde con su primera
+opción, que es la que él mismo propuso, y se registra en la salida. Así el plan nunca se
+queda colgado esperando una respuesta que no va a llegar.

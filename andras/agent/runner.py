@@ -45,8 +45,51 @@ def recon(ctx: ToolContext, policy, answers: dict | None = None) -> loop.LoopRes
     context = context_for(ctx.conn, ctx.mission, answers)
     if not evidence.list_for(ctx.conn, ctx.mission.id):
         ctx.log("  sin artefactos: el agente empezará por OSINT básico")
-    return loop.run(ctx, policy, system=prompts.RECON, context=context,
-                    status=lambda: plan_state(ctx.conn, ctx.plan_id))
+    result = loop.run(ctx, policy, system=prompts.RECON, context=context,
+                      status=lambda: plan_state(ctx.conn, ctx.plan_id))
+    if not result.submitted:
+        note = finalize(ctx.conn, ctx.plan_id, ctx.mission)
+        if note:
+            result.message = f"{result.message}\n{note}".strip()
+            ctx.log(f"  · {note}")
+    return result
+
+
+def finalize(conn, plan_id: str, mission) -> str:
+    """Cierra el plan cuando el modelo se cae o se queda sin pasos.
+
+    El humano revisa igual, así que un plan a medias se completa con lo conservador
+    (canales permitidos, esperas de 24 h y criterio por defecto) en vez de perderse.
+    """
+    plan = plans.get(conn, plan_id) if plan_id else None
+    if not plan or plan["status"] != "draft":
+        return ""
+    steps = plans.steps(conn, plan_id)
+    channels = [c for c in (mission.channels or ()) if c]
+    channels += [c for c in ("email", "sms", "phone") if c not in channels]
+    added = 0
+    while len(steps) + added < 3 and added < 3:
+        channel = channels[added % len(channels)]
+        plans.add_step(conn, plan_id, len(steps) + added + 1, channel,
+                       delay_hours=0 if not steps and not added else 24,
+                       trigger="always" if not steps and not added else "no_reply",
+                       why="paso de cierre añadido por el sistema al no terminar el agente")
+        added += 1
+    if not conn.execute("SELECT 1 FROM success_criteria WHERE plan_id=?",
+                        (plan_id,)).fetchone():
+        from andras.store.db import now
+
+        conn.execute("INSERT INTO success_criteria(plan_id,kind,spec,created_at)"
+                     " VALUES(?,?,?,?)",
+                     (plan_id, "credential_captured", '{"origen": "cierre automatico"}', now()))
+    if not (plan["narrative"] or "").strip():
+        conn.execute("UPDATE plans SET narrative=? WHERE id=?",
+                     (("Secuencia propuesta por el agente y cerrada por el sistema: "
+                       "se parte del canal más barato y se escala mientras el objetivo no "
+                       "responda."), plan_id))
+    conn.commit()
+    plans.set_status(conn, plan_id, "proposed")
+    return (f"plan cerrado por el sistema (+{added} pasos): revísalo antes de confirmar")
 
 
 def chat(ctx: ToolContext, policy, history: list[dict], message: str,

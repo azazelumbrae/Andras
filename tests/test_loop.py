@@ -212,3 +212,46 @@ def test_trim_handles_openai_tool_call_shape():
     assert loop._sane(messages)[0]["role"] == "system"
     assert all(m["role"] != "tool" or messages[i - 1]["role"] == "assistant"
                for i, m in enumerate(messages[1:], start=1))
+
+
+def test_finalize_completes_plan(conn, config, mission):
+    from andras.agent import runner
+    from andras.store import plans
+
+    plan_id = plans.create(conn, mission.id, "a medias")
+    plans.add_step(conn, plan_id, 1, "email", why="x", delay_hours=0, trigger="always")
+    note = runner.finalize(conn, plan_id, mission)
+    assert "cerrado por el sistema" in note
+    assert len(plans.steps(conn, plan_id)) == 3
+    assert plans.get(conn, plan_id)["status"] == "proposed"
+    assert conn.execute("SELECT 1 FROM success_criteria WHERE plan_id=?",
+                        (plan_id,)).fetchone()
+
+
+def test_finalize_ignores_confirmed_plan(conn, mission):
+    from andras.agent import runner
+    from andras.store import plans
+
+    plan_id = plans.create(conn, mission.id, "hecho")
+    plans.set_status(conn, plan_id, "confirmed")
+    assert runner.finalize(conn, plan_id, mission) == ""
+
+
+def test_ask_operator_without_tty_picks_first(monkeypatch):
+    import sys
+
+    from andras import cli
+
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: False, raising=False)
+    assert cli._ask_operator("¿seguir?", ("Sí", "No")) == "Sí"
+    assert cli._ask_operator("¿seguir?") == ""
+
+
+def test_spoof_advice_mentions_dmarc(conn, ctx, monkeypatch):
+    from andras.agent import channel_tools
+
+    monkeypatch.setattr(channel_tools, "_dig",
+                        lambda name, kind: ["v=DMARC1; p=reject"] if "_dmarc" in name else [])
+    result = channel_tools.spoof_advice(ctx, "acme.com", "Acme")
+    assert "p=reject" in result["text"]
+    assert result["data"]["dmarc"] == "reject"

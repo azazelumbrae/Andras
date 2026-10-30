@@ -230,3 +230,60 @@ def pickup_runbook(ctx) -> dict:
 
 def _status() -> Path:
     return ROOT / "data" / "channels.json"
+
+
+@tools.tool("spoof_advice", permission="read",
+            description="Explica qué suplantación permite el dominio de envío: nombre visible, "
+                        "dominio parecido, reply-to y límites de SPF/DMARC. Úsalo antes de "
+                        "elegir remitente.",
+            schema={"type": "object",
+                    "properties": {"domain": {"type": "string"},
+                                   "display_name": {"type": "string"}},
+                    "required": ["domain"]})
+def spoof_advice(ctx, domain: str, display_name: str = "") -> dict:
+    domain = domain.strip().lower()
+    name = display_name or ctx.mission.target_company or domain
+    dmarc = [t for t in _dig(f"_dmarc.{domain}", "TXT") if "v=dmarc1" in t.lower()]
+    policy = "reject" if dmarc and "p=reject" in dmarc[0].lower() else (
+        "quarantine" if dmarc and "p=quarantine" in dmarc[0].lower() else "none")
+    options = [
+        f"Nombre visible «{name}» <{domain}>: sólo cambia lo que se lee, no la dirección.",
+        "Reply-To a un buzón propio: la respuesta llega a ti aunque el From suene ajeno.",
+        ("Subdominio propio parecido (acme-soporte.tudominio.com): no hace falta tocar el "
+         "dominio real, pero cambia el dominio visible."),
+    ]
+    if policy == "none":
+        options.append("DMARC en `p=none`: puedes poner el dominio real en el From aunque "
+                       "no esté autorizado; caerá en spam si no alineas SPF/DKIM.")
+    else:
+        options.append(f"DMARC en `p={policy}`: con el dominio real en el From necesitas "
+                       "enviar por un servidor autorizado en su SPF o firmar con su DKIM.")
+    return {"text": "# Suplantación\n\n- " + "\n- ".join(options),
+            "data": {"dmarc": policy}}
+
+
+@tools.tool("landing_check", permission="read",
+            description="Comprueba que la landing de la campaña responde, tiene formulario y "
+                        "no filtra el token en el HTML. Antes de mandar el enlace.",
+            schema={"type": "object", "properties": {"url": {"type": "string"}},
+                    "required": ["url"]})
+def landing_check(ctx, url: str) -> dict:
+    import httpx
+
+    problems = []
+    try:
+        resp = httpx.get(url, timeout=20, follow_redirects=True)
+    except httpx.HTTPError as exc:
+        raise tools.ToolError(f"la landing no responde: {exc}") from exc
+    text = resp.text
+    if resp.status_code != 200:
+        problems.append(f"HTTP {resp.status_code}")
+    if "password" not in text.lower():
+        problems.append("sin campo de contraseña: no captura credenciales")
+    if "form" not in text.lower():
+        problems.append("sin formulario")
+    if "http://" in url and ctx.config.get("base_url", "").startswith("https"):
+        problems.append("enlace en claro con dominio https configurado")
+    summary = f"HTTP {resp.status_code} · {len(text)} bytes"
+    body = summary + ("\n- " + "\n- ".join(problems) if problems else "\nlanding correcta")
+    return {"text": body, "data": {"problems": problems, "status": resp.status_code}}

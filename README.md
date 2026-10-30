@@ -118,6 +118,12 @@ adapta sola al silencio de la víctima.
 | `channels audit/dkim` | SPF/DKIM/DMARC del dominio de envío |
 | `preview/send/serve/report` | entrenamiento v1 |
 
+## Operación
+
+Antes de una campaña real, sigue `docs/OPERACION.md`: dominio con SPF/DKIM/DMARC,
+buzón IMAP, `hook_secret`, landing comprobada y perfil de red. Al terminar, exporta el
+diario y quema la infraestructura.
+
 ## Evidencia
 
 Un dato vale lo que valen sus fuentes. Cada artifact guarda URL, snapshot con hash, fecha y
