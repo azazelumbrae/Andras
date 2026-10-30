@@ -213,20 +213,30 @@ assets HTTrack localised.
 
 ## Arsenal
 
-`andras/toolbox.py` catalogues 24 social-engineering tools by function — cloning, proxy,
-network, branding, capture, payload — each with what it does, install line, usage and hard limit.
-The agent consults the catalogue before promising a step.
+`andras/toolbox.py` catalogues 25 social-engineering tools by function — cloning, proxy,
+network, branding, capture, payload, agent — each with what it does, install line, usage and hard
+limit. The agent consults the catalogue before promising a step.
 
 ```sh
 andras toolbox list --category cloning
 andras toolbox show httrack
 andras toolbox check                   # what is missing and how to install it
 andras toolbox run httrack https://portal.acme.com
+andras toolbox image                   # build the Linux-only image, once
 ```
 
-Only the whitelist runs from inside ANDRAS: `httrack`, `urlcrazy`, `eyewitness`. The rest is
-consulted, because most want Linux, root or the same network as the target. `urlcrazy` is
-vendored in `vendor/urlcrazy` behind a launcher — it left rubygems.
+Everything is actually installed, not just catalogued:
+
+- **Native on macOS:** HTTrack, bettercap, ettercap, sslsplit, tcpreplay, mitmproxy, dnschef,
+  and the vendored tools behind `scripts/` launchers — Responder, evil-ssdp, DNSrebinder,
+  EyeWitness, urlcrazy, Yersinia (compiled from source) and PicoClaw.
+- **Inside the `andras/arsenal` image** (Kali base, built from `docker/arsenal.Dockerfile`):
+  `set`, `beef-xss`, `msfpc`, `wifi-honey`, `fiked`, `evilgrade`, `sniffjoke`, `thc-ipv6`,
+  `dsniff`, `tshark` and a `convoC2` compiled from source. `scripts/in-docker.sh` wraps them.
+- Most want root or the same network as the target, and the card says so.
+
+Only the whitelist runs from inside ANDRAS: `httrack`, `urlcrazy`, `eyewitness`. The container
+tools are launched through the same `argv_for`, so a whitelist entry needs no special case.
 
 ## OPSEC
 
@@ -256,7 +266,7 @@ burn the infrastructure.
 | `deliver` | real send and record |
 | `debrief` | mission report in markdown |
 | `clone fetch/attach/list/drop` | clone a portal and serve it with capture |
-| `toolbox list/show/check/run` | social-engineering arsenal |
+| `toolbox list/show/check/run/image` | social-engineering arsenal |
 | `packs --validate` | check technique packs |
 | `agent` | agent-driven recon and plan |
 | `plan confirm/list` | grant consent or list plans |
@@ -295,7 +305,7 @@ network profiles and wallet endpoints. Secrets go to `.env`.
 **Does my target's data leave the machine?** Only to the LLM you configure. Use Ollama to keep
 even that local.
 
-**Do I need Docker?** No. Docker only helps for the Linux-only tools in the arsenal.
+**Do I need Docker?** Not for the core. Docker is only needed for the Linux-only tools in the arsenal: `andras toolbox image` builds them once, `andras toolbox check` tells you what is missing.
 
 **Can it send from a lookalike domain?** It audits SPF/DKIM/DMARC and tells you what to publish.
 The `From` of a domain you do not own is never truly legitimate.

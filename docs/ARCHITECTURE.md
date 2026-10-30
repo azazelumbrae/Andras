@@ -357,20 +357,34 @@ está en la nota y en el diario.
 
 ## 19. Arsenal de ingeniería social
 
-`andras/toolbox.py` es un catálogo de 24 herramientas de Parrot, organizadas por función:
-clonado, proxy, red, marca, captura y payload. Cada ficha dice qué hace, cómo se instala, cómo
+`andras/toolbox.py` es un catálogo de 25 herramientas, organizadas por función: clonado,
+proxy, red, marca, captura, payload y agente. Cada ficha dice qué hace, cómo se instala, cómo
 se usa, qué punto de la campaña atiende y qué le impide correr aquí (Linux, root, red local).
 
-El catálogo no ejecuta nada salvo `which`: se consulta. `toolbox_snapshot` deja anotado en la
-misión qué había disponible al planificar, para que el agente no prometa un paso que depende
-de algo ausente. `andras toolbox list|show|check|snapshot` es la puerta del operador.
+El catálogo no ejecuta nada salvo `which` y `docker image inspect`: se consulta.
+`toolbox_snapshot` deja anotado en la misión qué había disponible al planificar, para que el
+agente no prometa un paso que depende de algo ausente. `andras toolbox
+list|show|check|snapshot|image` es la puerta del operador.
 
-Sólo `set` clona landings y sólo Evilginx (fuera del catálogo de Parrot) hace proxy con
-sesiones; el resto son apoyo de red, marca o captura, no alternativas al clonador propio.
+Sólo `set` clona landings y sólo Evilginx (fuera del catálogo) hace proxy con sesiones; el resto
+son apoyo de red, marca o captura, no alternativas al clonador propio.
 
-URLCrazy va **vendorizado** en `vendor/urlcrazy` con el lanzador `scripts/urlcrazy.sh`: ya no
-está en rubygems y así la herramienta se instala sola en su carpeta la primera vez, sin tocar
-nada del sistema. Sólo `httrack` sigue viniendo de brew.
+### Instalación real, no catálogo
+
+- Lo que sí corre en macOS se instala nativo: brew, pip en el venv o compilado.
+- Lo que no está empaquetado se **vendoriza** en `vendor/` con un lanzador en `scripts/`
+  (urlcrazy, responder, evil-ssdp, dnsrebinder, eyewitness, yersinia, picoclaw). Así se instala
+  solo, dentro del repo, sin tocar el sistema.
+- Lo que sólo existe para Linux va en la imagen `andras/arsenal`, definida en
+  `docker/arsenal.Dockerfile` y construida con `andras toolbox image`. El campo `container` de
+  la ficha lo declara; `argv_for` prefija `scripts/in-docker.sh <comando>`, que monta el
+  directorio de salida como `/work` y comparte la red del host.
+- `resolve_bin` resuelve vendorizado → venv → PATH → `~/.local/bin`, de modo que no hace falta
+  activar nada. `installed()` para fichas con `container` mira la imagen, no el PATH.
+
+`thc-ipv6`, `yersinia` y compañía se intentaron nativos: yersinia compila con un parche en
+`posix_signal`; thc-ipv6 no, porque macOS no tiene netlink y los shims de `vendor/compat` sólo
+cubren la compilación, no los sockets de paquete.
 
 ## 20. Clonador de portales
 

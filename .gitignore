@@ -20,3 +20,18 @@ data/**/*.raw
 
 # gemas de URLCrazy (se instalan solas con scripts/urlcrazy.sh)
 vendor/urlcrazy/vendor/
+
+# artefactos de compilación dentro de vendor/ (se regeneran con make)
+vendor/**/*.o
+vendor/**/*.lo
+vendor/**/*.la
+vendor/**/.libs/
+vendor/**/*.deps/
+vendor/yersinia/configure
+vendor/yersinia/aclocal.m4
+vendor/yersinia/autom4te.cache/
+vendor/yersinia/config.log
+vendor/yersinia/config.status
+vendor/yersinia/Makefile
+vendor/yersinia/src/Makefile
+vendor/thc-ipv6/*.o

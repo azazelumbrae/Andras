@@ -1046,6 +1046,18 @@ def toolbox_check() -> None:
     console.print(toolbox.summary())
 
 
+@toolbox_app.command("image")
+def toolbox_image() -> None:
+    """Construye la imagen andras/arsenal (herramientas sólo-Linux)."""
+    from andras import toolbox
+
+    ok, output = toolbox.build_image()
+    console.print(output)
+    if not ok:
+        raise typer.Exit(1)
+    console.print("imagen andras/arsenal lista")
+
+
 @toolbox_app.command("snapshot")
 def toolbox_snapshot(mission_id: str | None = typer.Option(None, "--mission")) -> None:
     """Anota el arsenal disponible en la misión."""

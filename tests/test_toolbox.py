@@ -37,15 +37,38 @@ def test_filter_by_category():
 
 def test_installed_uses_which(monkeypatch):
     monkeypatch.setattr(toolbox.shutil, "which", lambda name: "/usr/bin/" + name)
-    assert toolbox.installed(toolbox.get("set"))
+    assert toolbox.installed(toolbox.get("httrack"))
     monkeypatch.setattr(toolbox.shutil, "which", lambda name: None)
-    assert not toolbox.installed(toolbox.get("set"))
+    assert not toolbox.installed(toolbox.get("httrack"))
 
 
 def test_atk6_family_detected(monkeypatch):
     monkeypatch.setattr(toolbox.shutil, "which",
                         lambda name: "/usr/bin/" + name if name == "atk6-fake_router6" else None)
-    assert toolbox.installed(toolbox.get("thc-ipv6"))
+    assert toolbox.installed(toolbox.get("thc-ipv6")) or toolbox.get("thc-ipv6").container
+
+
+def test_container_tool_depends_on_image(monkeypatch):
+    tool = toolbox.get("set")
+    assert tool.container == "setoolkit"
+    monkeypatch.setattr(toolbox, "image_ready", lambda: False)
+    monkeypatch.setattr(toolbox.shutil, "which", lambda name: "/usr/bin/" + name)
+    assert not toolbox.installed(tool)
+    assert "andras/arsenal" in toolbox.blocker(tool)
+    monkeypatch.setattr(toolbox, "image_ready", lambda: True)
+    assert toolbox.installed(tool)
+
+
+def test_container_argv_prefixes_launcher(monkeypatch):
+    monkeypatch.setattr(toolbox, "image_ready", lambda: True)
+    argv = toolbox.argv_for(toolbox.get("thc-ipv6"), "en0")
+    assert argv[-2:] == ["atk6-fake_router6", "en0"]
+    assert argv[0].endswith("scripts/in-docker.sh")
+
+
+def test_native_argv_uses_binary(monkeypatch):
+    monkeypatch.setattr(toolbox, "resolve_bin", lambda tool: "/bin/echo")
+    assert toolbox.argv_for(toolbox.get("httrack"), "x") == ["/bin/echo", "x"]
 
 
 def test_blocker_explains_limits():
@@ -56,6 +79,7 @@ def test_blocker_explains_limits():
 
 def test_card_and_table(monkeypatch):
     monkeypatch.setattr(toolbox, "resolve_bin", lambda tool: "")
+    monkeypatch.setattr(toolbox, "image_ready", lambda: False)
     card = toolbox.card(toolbox.get("set"))
     assert "no instalada" in card and "Encaje" in card
     assert "set" in toolbox.table()
@@ -63,6 +87,7 @@ def test_card_and_table(monkeypatch):
 
 def test_snapshot_records_on_mission(ctx, monkeypatch):
     monkeypatch.setattr(toolbox, "resolve_bin", lambda tool: "")
+    monkeypatch.setattr(toolbox, "image_ready", lambda: False)
     result = toolbox_tools.toolbox_snapshot(ctx)
     assert result["data"]["ready"] == []
     notes = ctx.conn.execute("SELECT notes FROM missions WHERE id=?",
