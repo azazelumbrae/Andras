@@ -1,64 +1,95 @@
-# ANDRAS
+<p align="center">
+  <img src="assets/hero.jpg" alt="ANDRAS, señor de la discordia" width="100%">
+</p>
 
-Emulador de adversario para **un objetivo humano**. Recon OSINT dirigido, dossier con
-procedencia, pretexto generado con técnicas de red team de LLM y entrega multicanal.
-Local-first: nada sale sin una puerta humana.
+<h1 align="center">ANDRAS</h1>
 
-Sustituye al simulador de concienciación de la v1, que sigue disponible como entrenamiento
-rápido (`preview`, `send`, `serve`, `report`).
+<p align="center">
+  <em>El señor de la discordia, pero con evidencia.</em><br>
+  Emulación de adversario contra <strong>un objetivo humano</strong>, conducida por un agente LLM.
+</p>
 
-Diseño: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Operación: [docs/OPERACION.md](docs/OPERACION.md).
+<p align="center">
+  <a href="https://github.com/azazelumbrae/Andras/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/azazelumbrae/Andras/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="LICENSE"><img alt="Licencia: GPL-3.0-or-later" src="https://img.shields.io/badge/licencia-GPL--3.0--or--later-blue.svg"></a>
+  <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-3776ab.svg">
+  <img alt="Local-first" src="https://img.shields.io/badge/local--first-s%C3%AD-2ea44f.svg">
+  <img alt="Estado: alfa" src="https://img.shields.io/badge/estado-alfa-orange.svg">
+</p>
+
+<p align="center">
+  <a href="#instalación">Instalación</a> ·
+  <a href="#cómo-funciona">Cómo funciona</a> ·
+  <a href="#ciclo-de-una-misión">Ciclo de una misión</a> ·
+  <a href="docs/OPERACION.md">Operación</a> ·
+  <a href="docs/ARCHITECTURE.md">Diseño</a>
+</p>
+
+---
+
+ANDRAS no dispara correos a una lista. Investiga **a una persona concreta**, reúne pruebas con
+procedencia, propone por dónde entrar y redacta la secuencia que más duele. Tú revisas, confirmas
+y él ejecuta. Todo local: los datos del objetivo no salen de tu máquina y nada se envía sin una
+puerta humana delante.
+
+> **Local-first por diseño.** SQLite en disco, evidencias con hash, wallets en testnet, sin SaaS
+> de por medio. Si usas Ollama, ni el dossier sale de casa.
+
+## Por qué existe
+
+El phishing de manual falla por dos motivos: el gancho es genérico y el operador no sabe qué
+sostiene cada afirmación. ANDRAS ataca ambos.
+
+- **Evidencia antes que adjetivos.** Cada dato guarda URL, snapshot, fecha y confianza. Dos
+  dominios independientes lo suben a `corroborated`; lo que solo dijo el LLM queda `inferred` y
+  nunca aguanta un gancho por sí solo.
+- **Un plan que se lee antes de gastar el envío.** La secuencia completa, con canal, espera y
+  disparador, se imprime y se confirma. El consentimiento es del plan, no del primer correo.
+- **Adaptación al silencio.** Si la víctima no abre, no visita o no rellena, el siguiente golpe
+  cambia de canal en vez de repetir el mismo tiro.
+- **Límites escritos.** Topes de pasos, tokens, dinero y BTC. Cada herramienta del arsenal declara
+  qué le impide correr aquí en vez de fingir que vale.
 
 ## Instalación
 
-Copia `.env.example` a `.env` y rellena lo que uses: los secretos van ahí, no en
-`config.json`.
+Requisitos: Python 3.11+, macOS o Linux. Sin clave LLM funciona en modo tonto (patrones y
+registros); con Ollama no sale nada del equipo.
 
 ```sh
 git clone https://github.com/azazelumbrae/Andras.git && cd Andras
 python3 -m venv .venv
-.venv/bin/pip install -e '.[dev]'
+.venv/bin/pip install -e '.[dev]'      # añade '.[tui]' para la interfaz
+cp .env.example .env                   # secretos aquí, nunca en config.json
 cp config.example.json config.json     # edita SMTP, base_url y llm
-export ANDRAS_DEEPSEEK_API_KEY='...'
 .venv/bin/andras init
+.venv/bin/andras preflight             # semáforo del entorno
 ```
-
-Sin clave LLM el recon funciona en modo tonto (solo patrones y registros) y el dossier cae a
-agregación directa. Para no mandar el dossier fuera, usa `llm.provider: ollama`.
-
-## Wizard
-
-`andras` sin argumentos abre el wizard: entorno, modelo, campaña, objetivo. El agente
-conduce el resto. Los mismos pasos existen como comandos para scripting.
 
 ```sh
-andras              # wizard interactivo (Textual)
-andras preflight    # semáforo del entorno sin abrir la interfaz
-andras tools        # herramientas registradas del agente
+.venv/bin/andras                       # wizard (Textual): entorno, modelo, campaña, objetivo
 ```
 
-El wizard escribe en las mismas tablas que el CLI, así que un plan creado a mano se puede
-seguir en la interfaz y al contrario.
+El wizard escribe en las mismas tablas que el CLI: un plan creado a mano se sigue en la interfaz
+y al contrario. Los mismos pasos existen como comandos para scripting.
 
-## Agente
+## Cómo funciona
 
-El agente investiga y propone el plan; el humano lo revisa y confirma. Desde el wizard
-(`andras`) o por terminal:
-
-```sh
-andras agent --mission <id> [--auto] [--steps 20]   # recon + plan, sin enviar
-andras plan confirm <plan_id>                       # consentimiento de sus pasos
-andras run start --detach                           # daemon de ejecución
-andras run status|stop|pause|resume|abort <plan_id>
+```
+recon ──▶ dossier ──▶ ganchos ──▶ plan ──▶ revisión humana ──▶ ejecución ──▶ debrief
+  │           │           │         │            │                 │
+ OSINT     procedencia  dolor ×   canales +   tú confirmas    avisos + diario
+ + triaje  por artifact  prueba   disparadores  el plan        + límites
 ```
 
-El plan confirmado autoriza los envíos de sus pasos. El gasto por encima de 0,25 USD y las
-acciones administrativas siguen preguntando. Topes por defecto: 40 pasos, 300k tokens, 3 USD
-y 0,001 BTC (testnet). Se cambian con `set_budget` o en `config.json`.
+1. **Recon** lanza colectores OSINT dirigidos y hace triaje de lo que encuentra.
+2. **Dossier** destila el material y asigna un `artifact_id` a cada afirmación.
+3. **Ganchos** se ordenan por dolor × verificabilidad, no por lo llamativos que suenan.
+4. **Plan** convierte el gancho elegido en una secuencia de 3 a 6 pasos.
+5. **Revisión** la imprimes entera y confirmas.
+6. **Ejecución** sale por el daemon con presupuesto, reintentos y avisos.
+7. **Debrief** deja el informe y el diario exportable.
 
-Avisos por escritorio y Telegram (`notify` en config): `hit` cuando cae el objetivo,
-`critical` si un paso agota reintentos. El diario de la misión queda en
-`data/missions/<id>/journal.md` y se exporta con `andras notes export`.
+Cada fase escribe en SQLite y la siguiente se niega a correr sin material.
 
 ## Ciclo de una misión
 
@@ -71,31 +102,73 @@ andras hooks   --mission <id>          # propone ganchos y los puntúa
 andras hook-choose 2 --mission <id>
 andras campaign plan --mission <id> --channels email,sms,phone --length 4
 andras campaign show <plan_id>         # revisa la secuencia completa
+andras plan confirm <plan_id>          # consentimiento de sus pasos
 andras campaign run  <plan_id> --to ana@acme.com
 andras critic  --mission <id>          # auditoría adversarial antes de gastar el envío
 andras build   <attack_id>             # render + QA de un vector suelto
 andras deliver <attack_id> --to ana@acme.com
 andras debrief --mission <id>          # informe en data/reports
-andras serve                           # landing y captura (terminal aparte)
+andras serve                           # landing, píxel y captura (terminal aparte)
 ```
 
-Cada fase escribe en SQLite y la siguiente se niega a correr sin material. `deliver` y
-`campaign run` piden `SEND` por cada envío salvo que exista `ANDRAS_YES=1`.
+`deliver` y `campaign run` piden `SEND` por cada envío salvo que exista `ANDRAS_YES=1`.
+
+## Agente
+
+El agente investiga y propone; el humano decide. Puedes conducirlo desde el wizard o por
+terminal:
+
+```sh
+andras agent --mission <id> [--auto] [--steps 20]   # recon + plan, sin enviar
+andras plan confirm <plan_id>                       # autoriza los envíos de sus pasos
+andras run start --detach                           # daemon de ejecución
+andras run status|stop|pause|resume|abort <plan_id>
+```
+
+Permisos por clase de acción:
+
+| Clase | Ejemplos | Cuándo pregunta |
+|---|---|---|
+| `read` / `write` | recon, notas, dossier | nunca |
+| `send` | correo, SMS, Telegram | sin plan confirmado |
+| `spend` | dominios, wallet | por encima de 0,25 USD |
+| `admin` | DNS, quema de infraestructura | siempre |
+
+Topes por defecto: **40 pasos**, **300k tokens**, **3 USD**, **0,001 BTC** en testnet.
+
+Avisos por escritorio y Telegram (`notify`): `hit` cuando cae el objetivo, `critical` si un paso
+agota reintentos. El diario queda en `data/missions/<id>/journal.md` y se exporta con
+`andras notes export`.
 
 ## Campaña omnicanal
 
-`campaign plan` es el corazón del producto: el LLM recibe la meta, el gancho con su soporte y
-el catálogo de packs, y devuelve una secuencia de 3 a 6 pasos con canal, pack, espera y
-disparador. Los disparadores son `always`, `no_visit`, `visited`, `no_reply` y `no_submit`:
-el siguiente golpe solo sale si el anterior no consiguió su objetivo, así que la campaña se
-adapta sola al silencio de la víctima.
+`campaign plan` es el corazón del producto. El LLM recibe la meta, el gancho con su soporte y el
+catálogo de packs, y devuelve una secuencia con canal, pack, espera y disparador. Los disparadores
+—`always`, `no_visit`, `visited`, `no_reply`, `no_submit`— sólo dejan salir el siguiente golpe si
+el anterior falló, así que la campaña se adapta sola.
 
-- cada paso se genera con su propio guion completo, ligado al mismo gancho y a los mismos
-  artifact ids;
+- cada paso se genera con su guion completo, ligado al mismo gancho y a los mismos artifact ids;
 - `campaign show` imprime la secuencia entera antes de enviar nada;
 - `campaign run --skip-wait` recorre sin esperar y `--resume` retoma donde quedó;
-- si un adaptador no tiene credenciales (Twilio, SMTP) el envío se marca `failed` y la
-  terminal imprime el texto y el enlace con token para mandarlo a mano.
+- si un adaptador no tiene credenciales, el envío se marca `failed` y la terminal imprime el texto
+  y el enlace con token para mandarlo a mano.
+
+## Arsenal
+
+`andras/toolbox.py` cataloga 24 herramientas de ingeniería social por función —clonado, proxy,
+red, marca, captura, payload— con ficha, instalación, uso y límite real. El agente las consulta
+antes de prometer un paso.
+
+```sh
+andras toolbox list --category clonado
+andras toolbox show httrack
+andras toolbox check                   # qué falta y cómo se instala
+andras toolbox run httrack https://portal.acme.com
+```
+
+Sólo la lista blanca se ejecuta desde ANDRAS: `httrack`, `urlcrazy` y `eyewitness`. El resto se
+consulta, porque muchas piden Linux, root o estar en la misma red que el objetivo. `urlcrazy` va
+vendorizado en `vendor/urlcrazy` con su lanzador: ya no está en rubygems.
 
 ## Comandos
 
@@ -121,40 +194,45 @@ adapta sola al silencio de la víctima.
 | `wallet new/list` | burner, mixer y treasury |
 | `net show/set/burn` | perfiles de red y quema de infraestructura |
 | `channels audit/dkim` | SPF/DKIM/DMARC del dominio de envío |
-| `toolbox list/show/check/run` | arsenal de ingeniería social; `run` lanza httrack, urlcrazy o eyewitness |
-| `preview/send/serve/report` | entrenamiento v1 |
-
-## Operación
-
-Antes de una campaña real, sigue `docs/OPERACION.md`: dominio con SPF/DKIM/DMARC,
-buzón IMAP, `hook_secret`, landing comprobada y perfil de red. Al terminar, exporta el
-diario y quema la infraestructura.
-
-## Evidencia
-
-Un dato vale lo que valen sus fuentes. Cada artifact guarda URL, snapshot con hash, fecha y
-confianza. Dos dominios independientes lo marcan `corroborated`; lo que solo dijo el LLM se
-queda `inferred` y nunca sostiene un gancho por sí solo. Nada de "smoking guns": tres pruebas
-pasivas y verificables antes que un hallazgo espectacular sin contrastar.
+| `toolbox list/show/check/run` | arsenal de ingeniería social |
+| `preview/send/serve/report` | entrenamiento del simulador v1 |
 
 ## Técnicas
 
 Los frameworks de [unjail.ai](https://www.unjail.ai/how-jailbreaking-works) viven en
-`prompts/packs/`, en YAML versionado: cadena de 7 turnos (reconocimiento, inteligencia de
-proceso, pretexto, credibilidad, urgencia, autoridad, finisher), más Dark Psychology,
-Crescendo y DRA como capas de prompt. El pack elegido se inyecta en el plan y el contrato de
-completitud fuerza el artefacto entero.
+`prompts/packs/`, en YAML versionado: cadena de 7 turnos —reconocimiento, inteligencia de proceso,
+pretexto, credibilidad, urgencia, autoridad, finisher— más Dark Psychology, Crescendo y DRA como
+capas de prompt. El pack elegido se inyecta en el plan y el contrato de completitud fuerza el
+artefacto entero.
 
-## Seguridad
+## Evidencia
 
-- El servidor escucha en local y no habilita TLS.
+Un dato vale lo que valen sus fuentes. Nada de *smoking guns*: tres pruebas pasivas y verificables
+antes que un hallazgo espectacular sin contrastar. El dossier dice de dónde sale cada frase y con
+cuánta confianza, y el crítico señala lo que se contradice antes de que lo haga la víctima.
+
+## Seguridad y OPSEC
+
+- El servidor escucha en local y no habilita TLS: ponlo detrás de tu túnel.
 - Tokens opacos por campaña; el formulario guarda usuario y contraseña en SQLite.
 - Los webhooks exigen HMAC-SHA256 si defines `hook_secret`; sin él se aceptan en claro.
 - Las semillas de wallet viven en `data/andras.sqlite3`: laboratorio, no producción.
+- `config.json`, `.env`, `data/` y los snapshots están fuera de Git: llevan datos del objetivo.
 - `authorized_recipients` acota el entrenamiento v1; en misiones el alcance es el objetivo.
-- `config.json`, `data/` y los snapshots están fuera de Git: contienen datos del objetivo.
-- Usa el proyecto solo en ejercicios propios y autorizados.
+
+Antes de una campaña real, sigue [docs/OPERACION.md](docs/OPERACION.md): dominio con
+SPF/DKIM/DMARC, buzón IMAP, `hook_secret`, landing comprobada y perfil de red. Al terminar, exporta
+el diario y quema la infraestructura. Diseño interno en [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Estado
+
+Proyecto en alfa, funcional de punta a punta en laboratorio. Lo que todavía cojea está escrito en
+[docs/DEPRECATED.md](docs/DEPRECATED.md) y en las fichas del arsenal: sin credenciales Twilio,
+SMS y WhatsApp degradan a texto manual; sin dominio e IMAP no hay SPF/DKIM real ni detección de
+respuesta; sin `monero-wallet-rpc`, el swap y la mezcla de XMR quedan en runbook.
 
 ## Licencia
 
 GPL-3.0-or-later. Ver [LICENSE](LICENSE).
+
+<p align="center"><sub>Úsalo sólo en ejercicios propios y autorizados.</sub></p>
