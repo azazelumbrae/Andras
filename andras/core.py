@@ -7,7 +7,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 
+def _load_env() -> None:
+    """Carga `.env` si existe: los secretos no viven en config.json."""
+    try:
+        from dotenv import load_dotenv
+    except ImportError:  # pragma: no cover - dependencia declarada
+        return
+    load_dotenv(ROOT / ".env", override=False)
+
+
 def load_config():
+    _load_env()
     path = ROOT / "config.json"
     if not path.exists():
         raise SystemExit("Falta config.json. Ejecuta `python3 -m andras.cli init` y edita la configuración.")

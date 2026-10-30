@@ -32,6 +32,21 @@ def _fill_url(text: str, url: str) -> str:
                 .replace(render.TRACKING, url))
 
 
+PIXEL = ('<img src="{base}/px/{token}" width="1" height="1" alt="" '
+         'style="display:block;border:0">')
+
+
+def _with_pixel(html_body: str, config: dict, token: str) -> str:
+    """Añade el píxel de apertura al HTML. Sin `base_url` el correo sale sin seguimiento."""
+    base = (config.get("base_url") or "").rstrip("/")
+    if not base:
+        return html_body
+    tag = PIXEL.format(base=base, token=token)
+    if "</body>" in html_body:
+        return html_body.replace("</body>", tag + "</body>", 1)
+    return html_body + tag
+
+
 def deliver(conn, config, attack_id: str, to: str, *, force: bool = False) -> Outcome:
     """Renderiza, valida y entrega el ataque. No confirma con el humano."""
     attack = planner.load(conn, attack_id)
@@ -51,6 +66,8 @@ def deliver(conn, config, attack_id: str, to: str, *, force: bool = False) -> Ou
     text = _fill_url(rendered.text, url)
     text = text.replace("[Nombre del remitente]", config.get("from_name", "Soporte"))
     html_body = _fill_url(rendered.html, url) if rendered.html else None
+    if html_body:
+        html_body = _with_pixel(html_body, config, campaign_id)
 
     result = deliver_fn(attack["channel"], config, to, rendered.subject, text, html_body)
     conn.execute(

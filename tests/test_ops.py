@@ -221,3 +221,12 @@ def test_notes_export_by_attack_isolates(conn, mission, tmp_path, monkeypatch):
     path = notes.export_html(conn, mission.id, "atk1")
     assert "uno" in path.read_text() and "dos" not in path.read_text()
     assert path.name == "attack-atk1.html"
+
+
+def test_pixel_added_to_html():
+    from andras.delivery import pipeline
+
+    html = pipeline._with_pixel("<body>x</body>", {"base_url": "https://a.b/"}, "tok")
+    assert "https://a.b/px/tok" in html
+    assert html.endswith("</body>")
+    assert pipeline._with_pixel("<p>x</p>", {}, "tok") == "<p>x</p>"

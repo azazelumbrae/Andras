@@ -11,6 +11,9 @@ Diseño: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Instalación
 
+Copia `.env.example` a `.env` y rellena lo que uses: los secretos van ahí, no en
+`config.json`.
+
 ```sh
 python3 -m venv .venv
 .venv/bin/pip install -e '.[dev]'
