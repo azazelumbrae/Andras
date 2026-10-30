@@ -20,8 +20,10 @@ from andras.store import budgets, notes
                         "title": {"type": "string", "description": "título corto"},
                         "kind": {"type": "string", "enum": list(notes.KINDS)}},
                     "required": ["body"]})
-def note_write(ctx, body: str, title: str = "", kind: str = "obs") -> dict:
-    note = notes.add(ctx.conn, ctx.mission.id, body, title=title, kind=kind)
+def note_write(ctx, body: str, title: str = "", kind: str = "obs",
+               attack_id: str = "") -> dict:
+    note = notes.add(ctx.conn, ctx.mission.id, body, title=title, kind=kind,
+                     attack_id=attack_id or None)
     return {"text": f"nota #{note.id} guardada", "data": {"id": note.id}}
 
 

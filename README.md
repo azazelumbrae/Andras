@@ -112,7 +112,7 @@ adapta sola al silencio de la víctima.
 | `agent` | recon y plan conducidos por el agente |
 | `plan confirm/list` | confirmar el consentimiento o listar planes |
 | `run start/stop/status/pause/resume/abort` | daemon de ejecución |
-| `notes add/list/search/export` | diario de la campaña |
+| `notes add/list/search/export` | diario de la campaña (`--attack` para un vector) |
 | `wallet new/list` | burner, mixer y treasury |
 | `net show/set/burn` | perfiles de red y quema de infraestructura |
 | `channels audit/dkim` | SPF/DKIM/DMARC del dominio de envío |

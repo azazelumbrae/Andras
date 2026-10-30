@@ -477,7 +477,7 @@ class ReviewScreen(WizardScreen):
             plans.set_status(conn, plan_id, "confirmed")
             notes.add(conn, self.app.state.mission_id, f"plan `{plan_id}` confirmado por el "
                       f"operador ({step_count} pasos)", kind="decision", plan_id=plan_id)
-        self.app.push_screen("resumen")
+        self.app.push_screen("exec")
 
     def _cancel(self) -> None:
         config = self.app.state.config
@@ -487,6 +487,89 @@ class ReviewScreen(WizardScreen):
             notes.add(conn, self.app.state.mission_id, f"plan `{plan_id}` devuelto a borrador",
                       kind="decision", plan_id=plan_id)
         self.notify("Plan guardado como borrador.")
+
+
+class ExecScreen(WizardScreen):
+    """S8 · ejecución: arranca el daemon y vigila pasos y avisos."""
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Static("8 · Ejecución", classes="step")
+        yield Static("El daemon corre separado. Pausa o aborta desde aquí; el diario "
+                     "recoge cada decisión.", classes="hint")
+        self.status = Static("", id="daemon")
+        yield self.status
+        self.log_view = RichLog(highlight=True, markup=False, wrap=True)
+        yield self.log_view
+        yield Horizontal(
+            Button("Pausar", id="pause", variant="warning"),
+            Button("Reanudar", id="resume"),
+            Button("Abortar", id="abort", variant="error"),
+            Button("Parar daemon", id="stop"),
+            Button("Cerrar", id="close", variant="success"))
+        yield Footer()
+
+    @property
+    def plan_id(self) -> str:
+        return self.app.state.intent["plan_id"]
+
+    def on_mount(self) -> None:
+        self._launch()
+        self.set_interval(5, self._poll)
+
+    def _launch(self) -> None:
+        from andras.ops import daemon
+
+        if daemon.detach([self.plan_id]):
+            self._append("no se pudo arrancar el daemon (¿ya hay uno vivo?)")
+        else:
+            self._append(f"daemon separado para el plan {self.plan_id}")
+        self._poll()
+
+    def _append(self, text: str) -> None:
+        self.log_view.write(text)
+
+    def _poll(self) -> None:
+        from andras.ops import daemon
+
+        config = self.app.state.config
+        try:
+            with db.readonly(config) as conn:
+                steps = list(conn.execute(
+                    "SELECT position, channel, status FROM plan_steps WHERE plan_id=?"
+                    " ORDER BY position", (self.plan_id,)))
+                plan = plans.get(conn, self.plan_id)
+                alerts = list(conn.execute(
+                    "SELECT level, body FROM notifications WHERE plan_id=?"
+                    " ORDER BY id DESC LIMIT 3", (self.plan_id,)))
+        except Exception as exc:  # la pantalla no debe caerse
+            self.status.update(f"[error] {exc}")
+            return
+        self.status.update(f"daemon: {daemon.status()} · plan: {plan['status'] if plan else '?'}")
+        if plan and plan["status"] in {"achieved", "aborted", "done"}:
+            self._append(f"plan {plan['status']}: fin de la ejecución")
+        for step in steps:
+            self._append(f"{step['position']}. {step['channel']} — {step['status']}")
+        for alert in alerts:
+            self._append(f"[{alert['level']}] {alert['body'][:200]}")
+
+    def on_button_pressed(self, event) -> None:
+        from andras.ops import daemon
+
+        action = event.button.id
+        if action == "pause":
+            self._append(f"{daemon.pause(self.plan_id)} pasos pausados")
+        elif action == "resume":
+            self._append(f"{daemon.resume(self.plan_id)} pasos reanudados")
+        elif action == "abort":
+            daemon.abort(self.plan_id)
+            self._append("plan abortado")
+        elif action == "stop":
+            daemon.stop()
+            self._append("daemon parado")
+        elif action == "close":
+            self.app.push_screen("resumen")
+        self._poll()
 
 
 class ResumenScreen(WizardScreen):
@@ -546,7 +629,7 @@ class AndrasApp(App):
                          "campaign": CampaignScreen, "name": NameScreen,
                          "objective": ObjectiveScreen, "clarify": ClarifyScreen,
                          "recon": ReconScreen, "review": ReviewScreen,
-                         "resumen": ResumenScreen}
+                         "exec": ExecScreen, "resumen": ResumenScreen}
 
     def __init__(self) -> None:
         super().__init__()

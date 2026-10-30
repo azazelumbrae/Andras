@@ -212,3 +212,12 @@ def test_webhook_captures_credentials(conn, tmp_path):
     finally:
         httpd.shutdown()
         httpd.server_close()
+
+
+def test_notes_export_by_attack_isolates(conn, mission, tmp_path, monkeypatch):
+    monkeypatch.setattr(notes, "journal_path", lambda mission_id: tmp_path / "j.md")
+    notes.add(conn, mission.id, "uno", attack_id="atk1")
+    notes.add(conn, mission.id, "dos", attack_id="atk2")
+    path = notes.export_html(conn, mission.id, "atk1")
+    assert "uno" in path.read_text() and "dos" not in path.read_text()
+    assert path.name == "attack-atk1.html"

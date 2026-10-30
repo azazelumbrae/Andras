@@ -337,3 +337,12 @@ realmente se puede hacer: nombre visible, `Reply-To` propio o subdominio parecid
 En headless (`--auto` sin terminal), una pregunta del agente se responde con su primera
 opción, que es la que él mismo propuso, y se registra en la salida. Así el plan nunca se
 queda colgado esperando una respuesta que no va a llegar.
+
+## 17. Pantalla de ejecución
+
+Tras confirmar, el wizard salta a S8: arranca el daemon separado, refresca cada 5 s el estado
+de los pasos y los últimos avisos, y ofrece pausa, reanudación, aborto y parada. Cerrar la
+pantalla no para nada: el daemon sigue y el operador puede volver por terminal.
+
+La memoria de un ataque suelto se exporta con `andras notes export --mission <id> --attack
+<attack_id>`; el diario completo, sin `--attack`.

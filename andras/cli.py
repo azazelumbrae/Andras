@@ -790,14 +790,15 @@ def notes_search(query: str, mission_id: str | None = typer.Option(None, "--miss
 
 
 @notes_app.command("export")
-def notes_export(mission_id: str | None = typer.Option(None, "--mission")) -> None:
-    """Copia el diario en HTML estático."""
+def notes_export(mission_id: str | None = typer.Option(None, "--mission"),
+                 attack_id: str = typer.Option("", "--attack")) -> None:
+    """Copia el diario en HTML estático; con `--attack`, sólo la memoria de ese vector."""
     from andras.store import db, notes
 
     config = _config()
     mission = _mission(config, mission_id)
     with db.session(config) as conn:
-        path = notes.export_html(conn, mission.id)
+        path = notes.export_html(conn, mission.id, attack_id or None)
     console.print(f"Diario exportado: {path}")
 
 

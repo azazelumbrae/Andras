@@ -103,13 +103,24 @@ def timeline(conn: sqlite3.Connection, mission_id: str) -> list[Note]:
         "SELECT * FROM notes WHERE mission_id=? ORDER BY created_at", (mission_id,))]
 
 
-def export_html(conn: sqlite3.Connection, mission_id: str) -> Path:
-    """Copia el diario en HTML estático para leerlo fuera de la terminal."""
+def export_html(conn: sqlite3.Connection, mission_id: str, attack_id: str | None = None) -> Path:
+    """Copia el diario en HTML estático para leerlo fuera de la terminal.
+
+    Con `attack_id` sólo salen las notas de ese ataque, para entregar la memoria de un vector
+    suelto sin arrastrar toda la campaña.
+    """
     import html
 
     path = journal_path(mission_id)
-    target = path.with_suffix(".html")
-    body = path.read_text() if path.exists() else "# vacío\n"
+    if attack_id:
+        rows = conn.execute("SELECT * FROM notes WHERE mission_id=? AND attack_id=?"
+                            " ORDER BY created_at", (mission_id, attack_id)).fetchall()
+        body = "\n".join(f"## {r['created_at']} · {r['kind']} · {r['title']}\n{r['body_md']}"
+                         for r in rows) or "# sin notas para este ataque\n"
+        target = path.parent / f"attack-{attack_id}.html"
+    else:
+        target = path.with_suffix(".html")
+        body = path.read_text() if path.exists() else "# vacío\n"
     pieces = []
     for line in body.splitlines():
         if line.startswith("## "):
@@ -120,7 +131,7 @@ def export_html(conn: sqlite3.Connection, mission_id: str) -> Path:
             pieces.append(f"<p>{html.escape(line)}</p>")
     target.write_text(
         "<!doctype html><meta charset='utf-8'><title>Diario "
-        f"{html.escape(mission_id)}</title><style>body{{font:16px system-ui;max-width:760px;"
+        f"{html.escape(mission_id)}{' · ' + html.escape(attack_id) if attack_id else ''}</title><style>body{{font:16px system-ui;max-width:760px;"
         "margin:8vh auto;line-height:1.5;background:#10131a;color:#eef}h2{color:#8bd}"
         "</style>" + "\n".join(pieces))
     return target
