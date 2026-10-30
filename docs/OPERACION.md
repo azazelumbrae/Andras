@@ -49,9 +49,28 @@ decide.
 - [ ] Revisa `wallet_txs`: todo movimiento anotado, nada fuera del presupuesto.
 - [ ] Si se usó SIM, anota la ventana y la fecha de reversión posible del duplicado.
 
+## 6. Landing clonada
+
+La plantilla de entrenamiento no engaña a nadie; para una campaña real se clona el portal
+verdadero:
+
+```sh
+andras clone fetch https://portal.acme.com --mission <id> --depth 2
+andras serve                                   # terminal aparte
+open http://127.0.0.1:8765/__clone/<clone_id>/ # revisa que se vea igual
+andras clone attach <clone_id> <campaign_id>   # formularios pasan a ANDRAS
+```
+
+Comprueba en el navegador que el formulario envía, que el OTP aparece y que el `Location`
+final es `/thanks`. El espejo es estático: si el portal carga el login por JavaScript o exige
+sesión, HTTrack no basta y toca Evilginx.
+
+`andras clone list --mission <id>` muestra las capturas; `clone drop <id>` borra el espejo.
+
 ## Límites conocidos
 
 - Las transferencias BTC se firman fuera; la app sólo prepara y registra.
 - Monero necesita `monero-wallet-rpc` local.
+- El clon es estático: portales con login por JS o sesión viva piden Evilginx.
 - Sin Twilio, SMS y WhatsApp quedan `failed` con el texto para enviar a mano.
 - El SPF/DKIM sólo protege el dominio del atacante: no convierte un `From` ajeno en legítimo.

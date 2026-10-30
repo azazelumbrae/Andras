@@ -371,3 +371,20 @@ sesiones; el resto son apoyo de red, marca o captura, no alternativas al clonado
 URLCrazy va **vendorizado** en `vendor/urlcrazy` con el lanzador `scripts/urlcrazy.sh`: ya no
 está en rubygems y así la herramienta se instala sola en su carpeta la primera vez, sin tocar
 nada del sistema. Sólo `httrack` sigue viniendo de brew.
+
+## 20. Clonador de portales
+
+`andras/artifacts/clone.py` baja un portal con HTTrack a `data/clones/<misión>/<hash>` y lo
+sirve bajo el token de la campaña. No es un proxy: el espejo es estático, así que sirve para
+credenciales y códigos de un solo uso, no para portales con sesión viva (para eso, Evilginx).
+
+Al enganchar un clon a una campaña (`clone.attach`) se reescribe la entrada: cada `<form>`
+apunta a `/<token>/__capture`, que guarda usuario, contraseña y campos de OTP con los nombres
+habituales de cada proveedor, y el `action` original queda en un `__next` oculto. El meta CSP
+del original se elimina para no bloquear recursos. Las rutas del espejo se resuelven siempre
+dentro de su raíz.
+
+`capture_otp` (por defecto sí) encadena una pantalla de código tras las credenciales. Los
+clones se revisan sin token en `/__clone/<id>/`, aunque sus formularios sólo funcionan ya
+enganchados. `deliver` clona solo si el payload trae `portal`; si HTTrack falla, el envío sigue
+y el aviso queda en el resultado.

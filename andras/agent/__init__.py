@@ -3,6 +3,7 @@ from andras.agent import (
     builtin,
     channel_tools,
     clarify,
+    clone_tools,
     gates,
     loop,
     net_tools,
@@ -15,4 +16,4 @@ from andras.agent import (
     wallet_tools,
 )
 
-__all__ = ["builtin", "channel_tools", "clarify", "gates", "loop", "net_tools", "ops_tools", "plan_tools", "recon_tools", "runner", "toolbox_tools", "tools", "wallet_tools"]
+__all__ = ["builtin", "channel_tools", "clarify", "clone_tools", "gates", "loop", "net_tools", "ops_tools", "plan_tools", "recon_tools", "runner", "toolbox_tools", "tools", "wallet_tools"]

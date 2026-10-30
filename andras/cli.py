@@ -933,7 +933,90 @@ def channels_dkim(domain: str, selector: str = typer.Option("andras", "--selecto
 
 
 toolbox_app = typer.Typer(help="Arsenal de ingeniería social: fichas, estado e instalación.")
+clone_app = typer.Typer(help="Clonar un portal y servirlo bajo el token de la campaña.")
 app.add_typer(toolbox_app, name="toolbox")
+app.add_typer(clone_app, name="clone")
+
+
+@clone_app.command("fetch")
+def clone_fetch(url: str,
+                mission_id: str | None = typer.Option(None, "--mission"),
+                label: str = typer.Option("", "--label"),
+                timeout: int = typer.Option(300, "--timeout"),
+                depth: int = typer.Option(2, "--depth")) -> None:
+    """Baja un portal a data/clones. Tarda según el tamaño del sitio."""
+    from andras.artifacts import clone
+    from andras.store import db
+
+    config = _config()
+    mission = _mission(config, mission_id)
+    with db.session(config) as conn:
+        try:
+            clone_id = clone.create(conn, mission.id, url, label=label, timeout=timeout,
+                                    depth=depth)
+        except clone.CloneError as exc:
+            raise typer.BadParameter(str(exc)) from exc
+        entry = conn.execute("SELECT entry FROM clones WHERE id=?", (clone_id,)).fetchone()
+    console.print(f"clon {clone_id} · entrada {entry['entry']}")
+    console.print(f"revísalo en http://127.0.0.1:{config.get('port', 8765)}/__clone/{clone_id}/")
+
+
+@clone_app.command("attach")
+def clone_attach(clone_id: str, campaign_id: str) -> None:
+    """Engancha un clon a una campaña y reescribe sus formularios con el token."""
+    from andras.artifacts import clone
+    from andras.store import db
+
+    config = _config()
+    with db.session(config) as conn:
+        if not conn.execute("SELECT 1 FROM campaigns WHERE id=?", (campaign_id,)).fetchone():
+            raise typer.BadParameter(f"campaña inexistente: {campaign_id}")
+        try:
+            entry = clone.attach(conn, campaign_id, clone_id)
+        except clone.CloneError as exc:
+            raise typer.BadParameter(str(exc)) from exc
+    console.print(f"clon {clone_id} enganchado a {campaign_id} · {entry}")
+
+
+@clone_app.command("list")
+def clone_list(mission_id: str | None = typer.Option(None, "--mission")) -> None:
+    """Lista los clones de la misión y sus capturas."""
+    from andras.store import db
+
+    config = _config()
+    mission = _mission(config, mission_id)
+    with db.session(config) as conn:
+        rows = conn.execute(
+            "SELECT c.id, c.url, c.created_at,"
+            " (SELECT COUNT(*) FROM credentials k JOIN campaigns p ON p.id=k.campaign_id"
+            "  WHERE p.clone_id=c.id) AS captured"
+            " FROM clones c WHERE c.mission_id=? ORDER BY c.created_at DESC",
+            (mission.id,)).fetchall()
+    if not rows:
+        console.print("sin clones en esta misión")
+        return
+    for row in rows:
+        console.print(f"{row['id']} · {row['url']} · {row['captured']} capturas · "
+                      f"{row['created_at']}")
+
+
+@clone_app.command("drop")
+def clone_drop(clone_id: str) -> None:
+    """Borra un clon y su carpeta."""
+    import shutil
+    from pathlib import Path
+
+    from andras.store import db
+
+    config = _config()
+    with db.session(config) as conn:
+        row = conn.execute("SELECT root FROM clones WHERE id=?", (clone_id,)).fetchone()
+        if not row:
+            raise typer.BadParameter(f"clon inexistente: {clone_id}")
+        conn.execute("UPDATE campaigns SET clone_id=NULL WHERE clone_id=?", (clone_id,))
+        conn.execute("DELETE FROM clones WHERE id=?", (clone_id,))
+    shutil.rmtree(Path(row["root"]), ignore_errors=True)
+    console.print(f"clon {clone_id} borrado")
 
 
 @toolbox_app.command("list")

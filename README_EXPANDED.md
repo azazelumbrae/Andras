@@ -25,5 +25,6 @@ Estado actual:
 - [x] 201 packs importados de unjail.ai, validados
 - [x] informe de misión exportable (`debrief`)
 - [x] bot conversacional para Telegram (`andras bot`, responde con el guion)
-- [ ] proxy inverso tipo Evilginx
-- [ ] captura de OTP
+- [x] clonador de portales con HTTrack (`andras clone`) y espejo bajo token
+- [x] captura de OTP tras las credenciales
+- [ ] proxy inverso tipo Evilginx (para login por JS o sesión viva)

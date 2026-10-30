@@ -62,6 +62,17 @@ def deliver(conn, config, attack_id: str, to: str, *, force: bool = False) -> Ou
         (campaign_id, attack["angle"][:120], hash_target(to), db.now()))
     conn.execute("UPDATE campaigns SET mission_id=?, attack_id=?, channel=? WHERE id=?",
                  (attack["mission_id"], attack_id, attack["channel"], campaign_id))
+    warnings: list[str] = []
+    portal = (attack.get("portal") or "").strip()
+    if portal:
+        from andras.artifacts import clone
+
+        try:
+            clone_id = clone.create(conn, attack["mission_id"], portal,
+                                    label=f"{attack['mission_id']}:{attack_id}")
+            clone.attach(conn, campaign_id, clone_id)
+        except clone.CloneError as exc:
+            warnings.append(f"clon no preparado: {exc}")
     url = config["base_url"].rstrip("/") + "/" + campaign_id
     text = _fill_url(rendered.text, url)
     text = text.replace("[Nombre del remitente]", config.get("from_name", "Soporte"))
@@ -78,4 +89,7 @@ def deliver(conn, config, attack_id: str, to: str, *, force: bool = False) -> Ou
     if result.ok:
         conn.execute("INSERT INTO events(campaign_id,event,occurred_at) VALUES(?,?,?)",
                      (campaign_id, "sent", db.now()))
-    return Outcome(ok=result.ok, url=url, error=result.error, text=text)
+    error = result.error
+    if warnings:
+        error = "; ".join([error, *warnings]) if error else "; ".join(warnings)
+    return Outcome(ok=result.ok, url=url, error=error, text=text)

@@ -85,5 +85,6 @@
   },
   "searxng_url": "",
   "notify_email": "",
-  "notify_webhook": ""
+  "notify_webhook": "",
+  "capture_otp": true
 }

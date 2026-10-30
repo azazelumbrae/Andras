@@ -397,4 +397,19 @@ MIGRATIONS = [
     );
     """,
     "CREATE INDEX IF NOT EXISTS idx_bot_chat ON bot_messages(chat_id, id);",
+    # 22 — portales clonados servidos bajo el token de la campaña
+    """
+    CREATE TABLE IF NOT EXISTS clones (
+      id TEXT PRIMARY KEY,
+      mission_id TEXT NOT NULL,
+      label TEXT NOT NULL DEFAULT '',
+      url TEXT NOT NULL,
+      root TEXT NOT NULL,
+      entry TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_clones_mission ON clones(mission_id);
+    """,
+    _ensure_columns("credentials", {"otp": "TEXT NOT NULL DEFAULT ''"}),
+    _ensure_columns("campaigns", {"clone_id": "TEXT"}),
 ]

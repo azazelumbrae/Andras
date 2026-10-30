@@ -153,6 +153,21 @@ el anterior falló, así que la campaña se adapta sola.
 - si un adaptador no tiene credenciales, el envío se marca `failed` y la terminal imprime el texto
   y el enlace con token para mandarlo a mano.
 
+## Landing clonada
+
+La plantilla de entrenamiento no engaña a nadie. Para una campaña real, clona el portal de
+verdad con HTTrack y sírvelo bajo el token de la campaña:
+
+```sh
+andras clone fetch https://portal.acme.com --mission <id> --depth 2
+andras serve                                    # terminal aparte
+andras clone attach <clone_id> <campaign_id>    # ahora los formularios pasan por ANDRAS
+```
+
+Las credenciales y el código de un solo uso caen en `credentials` con el canal de eventos
+correspondiente. El espejo es estático: si el portal carga el login por JavaScript o exige
+sesión viva, HTTrack no llega y hace falta Evilginx. `clone list` y `clone drop` lo gestionan.
+
 ## Arsenal
 
 `andras/toolbox.py` cataloga 24 herramientas de ingeniería social por función —clonado, proxy,
@@ -195,6 +210,7 @@ vendorizado en `vendor/urlcrazy` con su lanzador: ya no está en rubygems.
 | `net show/set/burn` | perfiles de red y quema de infraestructura |
 | `channels audit/dkim` | SPF/DKIM/DMARC del dominio de envío |
 | `toolbox list/show/check/run` | arsenal de ingeniería social |
+| `clone fetch/attach/list/drop` | clonar un portal y servirlo con captura |
 | `preview/send/serve/report` | entrenamiento del simulador v1 |
 
 ## Técnicas
