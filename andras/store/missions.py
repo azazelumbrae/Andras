@@ -13,7 +13,8 @@ STATUSES = ("intake", "recon", "dossier", "hook", "plan", "built", "sent", "clos
 
 def create(conn: sqlite3.Connection, *, target_name: str, goal: str, target_role: str = "",
            target_company: str = "", domain: str = "", mode: str = "passive",
-           channels: list[str] | None = None, notes: str = "") -> Mission:
+           channels: list[str] | None = None, notes: str = "",
+           intent: dict | None = None) -> Mission:
     if not target_name.strip():
         raise ValueError("target_name obligatorio")
     if not goal.strip():
@@ -24,12 +25,31 @@ def create(conn: sqlite3.Connection, *, target_name: str, goal: str, target_role
                       notes=notes, created_at=now())
     conn.execute(
         "INSERT INTO missions(id,target_name,target_role,target_company,domain,goal,mode,"
-        "channels,status,notes,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+        "channels,status,notes,intent,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
         (mission.id, mission.target_name, mission.target_role, mission.target_company, mission.domain,
          mission.goal, mission.mode, json.dumps(mission.channels), mission.status,
-         mission.notes, mission.created_at),
+         mission.notes, json.dumps(intent or {}), mission.created_at),
     )
     return mission
+
+
+def update(conn: sqlite3.Connection, mission_id: str, **fields) -> None:
+    allowed = {"target_name", "target_role", "target_company", "domain", "goal", "mode",
+               "channels", "notes", "intent", "status"}
+    pairs = {}
+    for key, value in fields.items():
+        if key not in allowed or value is None:
+            continue
+        pairs[key] = json.dumps(value) if key in {"channels", "intent"} else value
+    if not pairs:
+        return
+    conn.execute(f"UPDATE missions SET {', '.join(f'{k}=?' for k in pairs)} WHERE id=?",
+                 (*pairs.values(), mission_id))
+
+
+def intent(conn: sqlite3.Connection, mission_id: str) -> dict:
+    row = conn.execute("SELECT intent FROM missions WHERE id=?", (mission_id,)).fetchone()
+    return json.loads(row["intent"] or "{}") if row else {}
 
 
 def get(conn: sqlite3.Connection, mission_id: str) -> Mission | None:

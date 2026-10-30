@@ -1,4 +1,5 @@
 """Migraciones forward-only. Se aplican en orden y se registran en PRAGMA user_version."""
+import sqlite3
 
 
 def _ensure_columns(table, columns):
@@ -11,6 +12,31 @@ def _ensure_columns(table, columns):
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
 
     return apply
+
+
+def _notes_fts(conn):
+    """Índice de texto completo; si el SQLite no trae FTS5 se busca con LIKE."""
+    try:
+        conn.executescript(
+            """
+            CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(title, body_md);
+            CREATE TRIGGER IF NOT EXISTS notes_ai AFTER INSERT ON notes BEGIN
+              INSERT INTO notes_fts(rowid, title, body_md) VALUES (new.id, new.title, new.body_md);
+            END;
+            CREATE TRIGGER IF NOT EXISTS notes_ad AFTER DELETE ON notes BEGIN
+              DELETE FROM notes_fts WHERE rowid = old.id;
+            END;
+            CREATE TRIGGER IF NOT EXISTS notes_au AFTER UPDATE ON notes BEGIN
+              DELETE FROM notes_fts WHERE rowid = old.id;
+              INSERT INTO notes_fts(rowid, title, body_md) VALUES (new.id, new.title, new.body_md);
+            END;
+            INSERT INTO notes_fts(rowid, title, body_md)
+              SELECT id, title, body_md FROM notes
+              WHERE id NOT IN (SELECT rowid FROM notes_fts);
+            """)
+    except sqlite3.OperationalError:
+        conn.execute("CREATE TABLE IF NOT EXISTS notes_fts(rowid INTEGER PRIMARY KEY,"
+                     " title TEXT, body_md TEXT)")
 
 
 MIGRATIONS = [
@@ -221,4 +247,138 @@ MIGRATIONS = [
     );
     CREATE INDEX IF NOT EXISTS idx_plan_steps ON plan_steps(plan_id, position);
     """,
+    # 13 — memoria por campaña y personas/remitentes
+    """
+    CREATE TABLE IF NOT EXISTS notes (
+      id INTEGER PRIMARY KEY,
+      mission_id TEXT NOT NULL REFERENCES missions(id) ON DELETE CASCADE,
+      plan_id TEXT REFERENCES plans(id) ON DELETE CASCADE,
+      attack_id TEXT,
+      kind TEXT NOT NULL DEFAULT 'obs',
+      title TEXT NOT NULL DEFAULT '',
+      body_md TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_notes_mission ON notes(mission_id, created_at);
+    CREATE TABLE IF NOT EXISTS personas (
+      id TEXT PRIMARY KEY,
+      mission_id TEXT NOT NULL REFERENCES missions(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL DEFAULT 'email',
+      sender_name TEXT NOT NULL DEFAULT '',
+      domain TEXT NOT NULL DEFAULT '',
+      address TEXT NOT NULL DEFAULT '',
+      phone TEXT NOT NULL DEFAULT '',
+      bio TEXT NOT NULL DEFAULT '',
+      avatar_path TEXT,
+      burned INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+    """,
+    # 14 — planificador: trabajos, criterios de éxito y avisos
+    """
+    CREATE TABLE IF NOT EXISTS jobs (
+      id INTEGER PRIMARY KEY,
+      plan_id TEXT NOT NULL REFERENCES plans(id) ON DELETE CASCADE,
+      step_id INTEGER NOT NULL REFERENCES plan_steps(id) ON DELETE CASCADE,
+      due_at TEXT NOT NULL,
+      state TEXT NOT NULL DEFAULT 'queued',
+      attempts INTEGER NOT NULL DEFAULT 0,
+      lease_until TEXT,
+      last_error TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      UNIQUE (step_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_jobs_due ON jobs(state, due_at);
+    CREATE TABLE IF NOT EXISTS success_criteria (
+      id INTEGER PRIMARY KEY,
+      plan_id TEXT NOT NULL REFERENCES plans(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL,
+      spec TEXT NOT NULL DEFAULT '{}',
+      met_at TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS notifications (
+      id INTEGER PRIMARY KEY,
+      plan_id TEXT REFERENCES plans(id) ON DELETE CASCADE,
+      level TEXT NOT NULL DEFAULT 'info',
+      channel TEXT NOT NULL,
+      body TEXT NOT NULL,
+      ok INTEGER NOT NULL DEFAULT 0,
+      error TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL
+    );
+    """,
+    # 15 — wallets: burner, mixer y treasury por misión
+    """
+    CREATE TABLE IF NOT EXISTS wallets (
+      id INTEGER PRIMARY KEY,
+      mission_id TEXT NOT NULL REFERENCES missions(id) ON DELETE CASCADE,
+      role TEXT NOT NULL DEFAULT 'burner',
+      chain TEXT NOT NULL,
+      address TEXT NOT NULL,
+      xpub TEXT NOT NULL DEFAULT '',
+      fingerprint TEXT NOT NULL DEFAULT '',
+      label TEXT NOT NULL DEFAULT '',
+      path TEXT NOT NULL DEFAULT '',
+      burner INTEGER NOT NULL DEFAULT 0,
+      burned INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_wallets_mission ON wallets(mission_id, chain);
+    CREATE TABLE IF NOT EXISTS wallet_txs (
+      id INTEGER PRIMARY KEY,
+      wallet_id INTEGER NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
+      txid TEXT NOT NULL DEFAULT '',
+      direction TEXT NOT NULL DEFAULT 'out',
+      amount TEXT NOT NULL DEFAULT '0',
+      fee TEXT NOT NULL DEFAULT '0',
+      counterparty TEXT NOT NULL DEFAULT '',
+      purpose TEXT NOT NULL DEFAULT '',
+      state TEXT NOT NULL DEFAULT 'built',
+      created_at TEXT NOT NULL
+    );
+    """,
+    # 16 — perfiles de red
+    """
+    CREATE TABLE IF NOT EXISTS net_profiles (
+      id TEXT PRIMARY KEY,
+      mission_id TEXT NOT NULL REFERENCES missions(id) ON DELETE CASCADE,
+      mode TEXT NOT NULL DEFAULT 'direct',
+      doh_url TEXT NOT NULL DEFAULT '',
+      ua_pool TEXT NOT NULL DEFAULT '[]',
+      jitter_ms INTEGER NOT NULL DEFAULT 0,
+      proxy_url TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL
+    );
+    """,
+    # 16b — detección de infra
+    _ensure_columns("infra", {"detected_at": "TEXT"}),
+    # 17 — auditoría de herramientas del agente
+    """
+    CREATE TABLE IF NOT EXISTS tool_runs (
+      id INTEGER PRIMARY KEY,
+      run_id TEXT NOT NULL,
+      mission_id TEXT NOT NULL DEFAULT '',
+      tool TEXT NOT NULL,
+      args TEXT NOT NULL DEFAULT '{}',
+      result TEXT NOT NULL DEFAULT '',
+      permission TEXT NOT NULL DEFAULT 'read',
+      cost_usd REAL NOT NULL DEFAULT 0,
+      ms INTEGER NOT NULL DEFAULT 0,
+      ok INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_tool_runs_run ON tool_runs(run_id);
+    """,
+    # 18 — presupuesto y consentimiento de la misión
+    _ensure_columns("missions", {
+        "intent": "TEXT NOT NULL DEFAULT '{}'",
+        "budget": "TEXT NOT NULL DEFAULT '{}'",
+        "spend_usd": "REAL NOT NULL DEFAULT 0",
+        "spend_crypto": "TEXT NOT NULL DEFAULT '{}'",
+    }),
+    # 18b — índice de eventos por nombre
+    "CREATE INDEX IF NOT EXISTS idx_events_name ON events(event);",
+    # 19 — búsqueda de notas (FTS5 si el binario lo trae)
+    _notes_fts,
 ]

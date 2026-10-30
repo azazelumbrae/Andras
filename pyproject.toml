@@ -27,10 +27,11 @@ andras = "andras.cli:main"
 
 [tool.setuptools]
 packages = ["andras", "andras.store", "andras.brain", "andras.evidence",
-            "andras.recon", "andras.artifacts", "andras.delivery"]
+            "andras.recon", "andras.artifacts", "andras.delivery", "andras.agent",
+            "andras.tui"]
 
 [tool.setuptools.package-data]
-andras = ["templates/*.j2", "templates/**/*.j2"]
+andras = ["templates/*.j2", "templates/**/*.j2", "tui/*.tcss"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -45,3 +46,4 @@ ignore = ["BLE001"]
 
 [tool.ruff.lint.per-file-ignores]
 "andras/tools.py" = ["S112"]
+"andras/agent/tools.py" = ["S112"]

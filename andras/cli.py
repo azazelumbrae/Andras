@@ -14,7 +14,8 @@ from rich.table import Table
 from andras.core import ROOT, database, load_config, load_scenario, new_campaign, record
 from andras.models import Mission
 
-app = typer.Typer(add_completion=False, help="Emulador de adversario OSINT + ingeniería social.")
+app = typer.Typer(add_completion=False, help="Emulador de adversario OSINT + ingeniería social.",
+                  invoke_without_command=True)
 console = Console()
 
 PREVIEW_COMMANDS = {"osint-discover", "phishing-spear", "extortion-bec",
@@ -51,6 +52,35 @@ def _table(title: str, columns: list[str], rows: list[list]) -> None:
     for row in rows:
         table.add_row(*[str(cell) for cell in row])
     console.print(table)
+
+
+@app.callback()
+def _root(ctx: typer.Context) -> None:
+    """Sin subcomando, abre el wizard."""
+    if ctx.invoked_subcommand is None:
+        from andras.tui import run
+
+        run()
+        raise typer.Exit
+
+
+@app.command()
+def preflight() -> None:
+    """Comprueba el entorno: modelos, correo, tor, wallets y avisos."""
+    from andras import preflight as checks
+
+    report = checks.run()
+    console.print(checks.render(report))
+    if checks.blocking(report):
+        raise typer.Exit(1)
+
+
+@app.command("tools")
+def list_tools() -> None:
+    """Lista las herramientas que el agente puede usar."""
+    from andras.agent import tools as registry
+
+    console.print(registry.describe())
 
 
 # ------------------------------------------------------------------ v1: entrenamiento

@@ -22,6 +22,20 @@ export ANDRAS_DEEPSEEK_API_KEY='...'
 Sin clave LLM el recon funciona en modo tonto (solo patrones y registros) y el dossier cae a
 agregación directa. Para no mandar el dossier fuera, usa `llm.provider: ollama`.
 
+## Wizard
+
+`andras` sin argumentos abre el wizard: entorno, modelo, campaña, objetivo. El agente
+conduce el resto. Los mismos pasos existen como comandos para scripting.
+
+```sh
+andras              # wizard interactivo (Textual)
+andras preflight    # semáforo del entorno sin abrir la interfaz
+andras tools        # herramientas registradas del agente
+```
+
+El wizard escribe en las mismas tablas que el CLI, así que un plan creado a mano se puede
+seguir en la interfaz y al contrario.
+
 ## Ciclo de una misión
 
 ```sh

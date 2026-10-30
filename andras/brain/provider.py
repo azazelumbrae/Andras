@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 import time
 from dataclasses import dataclass
 
@@ -157,6 +158,62 @@ def complete_json(config, messages, *, phase: str = "default", temperature: floa
             last = "JSON inválido"
             broken = raw
     raise LLMError(f"El modelo no devolvió JSON usable ({last})")
+
+
+def complete_tools(config, messages: list[dict], tools: list[dict], *, phase: str = "agent",
+                   temperature: float = 0.3, max_tokens: int = 2000) -> dict:
+    """Un turno con `tools`. Devuelve el mensaje del modelo tal cual (con `tool_calls`).
+
+    No interpreta nada: el bucle del agente decide. El failover es el mismo que en `complete`.
+    """
+    targets = resolve(config, phase)
+    if not targets:
+        raise LLMError("Ningún proveedor LLM tiene clave para el agente.")
+    errors = []
+    for target in targets:
+        try:
+            return _call_tools(target, messages, tools, temperature, max_tokens)
+        except LLMError as exc:
+            errors.append(f"{target.name}: {exc}")
+    raise LLMError("Todos los proveedores fallaron → " + " | ".join(errors))
+
+
+def _call_tools(target: Target, messages, tools, temperature, max_tokens) -> dict:
+    payload = {"model": target.model, "messages": messages, "temperature": temperature,
+               "max_tokens": max_tokens, "tools": tools, "tool_choice": "auto"}
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {target.api_key}"}
+    last = ""
+    for attempt in range(3):
+        try:
+            resp = httpx.post(f"{target.base_url}/chat/completions", json=payload,
+                              headers=headers, timeout=target.timeout)
+        except httpx.HTTPError as exc:
+            last = str(exc)
+            time.sleep(1.5 * (attempt + 1))
+            continue
+        if resp.status_code in TRANSIENT:
+            last = f"HTTP {resp.status_code}"
+            time.sleep(1.5 * (attempt + 1))
+            continue
+        if resp.status_code >= 400:
+            raise LLMError(f"HTTP {resp.status_code}: {resp.text[:300]}")
+        try:
+            body = resp.json()
+            message = body["choices"][0]["message"]
+        except (KeyError, IndexError, ValueError) as exc:
+            raise LLMError(f"respuesta inesperada: {exc}") from exc
+        usage = body.get("usage", {}) or {}
+        calls = []
+        for call in message.get("tool_calls") or []:
+            function = call.get("function", {})
+            calls.append({"id": call.get("id") or secrets.token_hex(6),
+                          "name": function.get("name", ""),
+                          "arguments": function.get("arguments", "")})
+        return {"content": message.get("content") or "",
+                "reasoning": message.get("reasoning") or "",
+                "tool_calls": calls, "usage": usage,
+                "provider": target.name, "model": target.model}
+    raise LLMError(f"sin respuesta tras reintentos ({last})")
 
 
 def strip_fences(text: str) -> str:
