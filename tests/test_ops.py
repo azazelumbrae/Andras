@@ -230,3 +230,12 @@ def test_pixel_added_to_html():
     assert "https://a.b/px/tok" in html
     assert html.endswith("</body>")
     assert pipeline._with_pixel("<p>x</p>", {}, "tok") == "<p>x</p>"
+
+
+def test_preflight_warns_without_hook_secret(config):
+    from andras import preflight
+
+    names = {check.name: check.level for check in preflight.run(config)}
+    assert names["firma webhooks"] == preflight.WARN
+    assert names["base_url"] == preflight.FAIL
+    assert "entorno" in names

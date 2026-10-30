@@ -89,9 +89,18 @@ def list_tools() -> None:
 def init(searxng: bool = typer.Option(False, "--searxng",
                                       help="prepara un SearXNG local en docker")) -> None:
     """Crea config.json y la base de datos si faltan."""
+    import secrets as secrets_mod
+
     config_path = ROOT / "config.json"
     if not config_path.exists():
         config_path.write_text((ROOT / "config.example.json").read_text())
+        data = json.loads(config_path.read_text())
+        data["hook_secret"] = secrets_mod.token_hex(32)
+        config_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+    env_path = ROOT / ".env"
+    if not env_path.exists() and (ROOT / ".env.example").exists():
+        env_path.write_text((ROOT / ".env.example").read_text())
+        console.print("Creado `.env` desde `.env.example`: rellena los secretos.")
     if searxng:
         import secrets
 

@@ -82,6 +82,16 @@ def run(config: dict | None = None) -> list[Check]:
                         config.get("searxng_url") or "sin SearXNG: la búsqueda web es frágil",
                         "levanta SearXNG (docker run -p 8888:8080 searxng/searxng) y pon "
                         "`searxng_url` en config.json"))
+    checks.append(Check("firma webhooks", OK if config.get("hook_secret") else WARN,
+                        "HMAC configurado" if config.get("hook_secret")
+                        else "sin `hook_secret`: los webhooks se pueden falsear",
+                        "genera uno con `openssl rand -hex 32`"))
+    checks.append(Check("entorno", OK if (ROOT / ".env").exists() else WARN,
+                        ".env presente" if (ROOT / ".env").exists() else "sin .env",
+                        "copia .env.example a .env para los secretos"))
+    checks.append(Check("base_url", OK if str(config.get("base_url", "")).startswith("http")
+                        else FAIL, config.get("base_url") or "sin base_url",
+                        "los enlaces y el píxel dependen de `base_url`"))
     checks.append(Check("avisos", OK if _notify_ready(config) else WARN,
                         _notify_detail(config), "configura el bloque `notify`"))
     checks.append(Check("textual", OK if _importable("textual") else FAIL,
