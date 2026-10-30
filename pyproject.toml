@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "andras"
 version = "3.0.0a1"
-description = "Emulador de adversario OSINT + ingeniería social para un objetivo humano"
+description = "Social engineering attacker with an LLM agent: OSINT, pretexts, reviewable plan, OPSEC"
 requires-python = ">=3.11"
 license = {text = "GPL-3.0-or-later"}
 readme = "README.md"

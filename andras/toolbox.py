@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 CATEGORIES = ("clonado", "proxy", "red", "marca", "captura", "payload")
+ALIASES = {"cloning": "clonado", "network": "red", "branding": "marca",
+           "capture": "captura"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -187,7 +189,12 @@ class ToolboxError(RuntimeError):
     pass
 
 
+def _norm(category: str) -> str:
+    return ALIASES.get(category.strip().lower(), category.strip().lower())
+
+
 def all_tools(category: str = "") -> list[Tool]:
+    category = _norm(category)
     if category and category not in CATEGORIES:
         raise ToolboxError(f"categoría desconocida: {category}")
     return [t for t in TOOLS if not category or t.category == category]

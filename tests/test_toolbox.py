@@ -114,3 +114,9 @@ def test_run_executes_and_saves(monkeypatch, tmp_path):
     ok, output, _ = toolbox.run_tool("httrack", "https://acme.com")
     assert ok and "acme.com" in output
     assert (tmp_path / "salida.txt").read_text().strip()
+
+
+def test_category_aliases():
+    assert [t.key for t in toolbox.all_tools("cloning")] == \
+        [t.key for t in toolbox.all_tools("clonado")]
+    assert all(t.category == "red" for t in toolbox.all_tools("network"))
