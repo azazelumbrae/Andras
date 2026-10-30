@@ -7,6 +7,8 @@ name = "andras"
 version = "3.0.0a1"
 description = "Emulador de adversario OSINT + ingeniería social para un objetivo humano"
 requires-python = ">=3.11"
+license = {text = "GPL-3.0-or-later"}
+readme = "README.md"
 dependencies = [
   "typer>=0.12",
   "rich>=13.7",
@@ -15,6 +17,9 @@ dependencies = [
   "Jinja2>=3.1",
   "python-dotenv>=1.0",
 ]
+
+[project.urls]
+Repository = "https://github.com/azazelumbrae/Andras"
 
 [project.optional-dependencies]
 tui = ["textual>=0.70"]

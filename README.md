@@ -154,3 +154,7 @@ completitud fuerza el artefacto entero.
 - `authorized_recipients` acota el entrenamiento v1; en misiones el alcance es el objetivo.
 - `config.json`, `data/` y los snapshots están fuera de Git: contienen datos del objetivo.
 - Usa el proyecto solo en ejercicios propios y autorizados.
+
+## Licencia
+
+GPL-3.0-or-later. Ver [LICENSE](LICENSE).
